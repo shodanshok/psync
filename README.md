@@ -49,8 +49,19 @@ L: MOVE test.txt test.txt.9876.psync.ignore (temporary scratch file, this event 
 L: MOVE test.txt.9876.psync.ignore new.txt (as the source filename is excluded, this event will be skipped)  
 *Result:* the file is moved/renamed on remote partner without any backired event  
 
+## File structure
+In order to perform well in low-bandwidth, high latency link, Psync is composed of a centralized, left-only "brain" called `psync.py` and decentralized `filter.py`, `helpers.py` and `cinotify` files. In addition, I wrote some (rather crude) shell wrapper to start/stop it and to check replication correctness. These wrapper are nor elegant nor polished, by they accomplish their work. You are free to contribute with better "glue code" (and to enhance/rewrite/refactor the core code also!).  
 
-In order 
+Some more in-depth information:
+
+**`psync.py`** is Psync's central brain. It decides if/when/how to propagate an event, and it manage various heartbeats to be sure all is working properly.  
+**`filter.py`** is a decentralized python script in charge of collecting events. It accomplish its task opening a pipe to the next component...  
+**`cinotify/cinotify`** is a (binary) inotify reader. It listen on a inotify file descriptor and prints events on standard output. Why I need a separate, C-based inotify reader rather than implementing it in `filter.py`? The simple answer is speed: all current python-based inotify implementation are *very* slow, so slow that you can not monitor any subtree remotely large. The astute reader will ask why I don't used the already-ready [inotifywait](https://github.com/rvoicilas/inotify-tools/wiki) tool. In fact, I *used* it in previous Psync version, but I discovered on very serious bug in how it handle directory renames. As I don't think to 100% understand inotifywait code, I wrote a custom C-based inotify reader and, without much imagination, I called it `cinotify`. In its directory, you will find an x86-64 compiled version (called, again, `cinotify`) and its source code (`cinotify.c`)  
+**`libs/helpers.py`** is a small collection of helpers functions. Helpers are the small programs needed to manage the rename-dance necessary to avoid events to be backfired. Feel free to issue `libs/helpers.py --help` to have more information.  
+**`libs/utils.py`** contain various shared utility functions  
+**`libs/config.py`** is Psync's configuration file (more on that later)  
+**`start, stop, check and runcheck`** are some (crude) shell wrapper used to start/stop/check Psync operations
+
 
 ## Usage
 `psync.py -r remotehost \<srcroot\> \<dstroot\>`  
