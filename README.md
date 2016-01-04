@@ -2,12 +2,12 @@
 Psync is a realtime, two-way syncronization utility written in Python
 
 ## Summary
-[Usage](https://github.com/shodanshok/psync#usage)
-[How it works]
-[Command line options summary]
-[Command line options explained]
-[Config file notes]
-[FAQ]
+[Usage](https://github.com/shodanshok/psync#usage)  
+[How it works]  
+[Command line options summary]  
+[Command line options explained]  
+[Config file notes]  
+[FAQ]  
 
 ## How it works
 The basic idea is that, using inotify, one should be able to synchronize in (more or less) realtime two directory subtree (called *left* and *right* in this document), being on the same server or two different ones. This idea is not a new concept after all - utilities as lsyncd already accomplished this task.
