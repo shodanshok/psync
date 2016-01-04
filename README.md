@@ -22,7 +22,7 @@ This can be fixed only with a "central brain" which coordinate events and filter
 **HOW EVENTS ARE COLLECTED AND PROPAGATED**  
 As stated above, events are collected using [inotify](http://linux.die.net/man/7/inotify). After being collected, events are queued and issued to the replication partner. The partner apply them in a manner that avoid re-catching (and re-propagating) events back to source; this is accomplished by ad-hoc rules excluding certain "protected" filename/suffixes (eg: "psync.ignore") that psync know to ignore, avoiding sending back the event to its source.
 
-Sending data is accomplished via [rsync](https://rsync.samba.org/), which need to be installed on both partners. Moves and deletion are accomplished via a custom helper script. In particular, moves are executed without needing to re-transfer any data (most of the times).
+Sending data is accomplished via [rsync](https://rsync.samba.org/), which need to be installed on both partners. Moves and deletion are accomplished via a custom helper script. In particular, moves are executed without needing to re-transfer any data (most of the times). Both rsync and helper-based events need SSH automatic (non-interactive) access, so it is mandatory to use public/private keys to automate the login phase.
 
 Below you can find some event propagation examples. **L** and **R** means left and right, respectively.
 
@@ -69,6 +69,7 @@ Some more in-depth information:
 `psync.py -r remotehost \<srcroot\> \<dstroot\>`  
 *Example:* `psync -r slave.assyoma.it /opt/fileserver /opt/fileserver`  
 *Note:* psync (and I means *all* the psync tree, not only the psync.py file) should be installed on both sides (left and right)  
+**Note:** as psync will use SSH to propagate events, you *need* to setup pubkey based automatic login
 By default, logs will be written inside `/var/log/psync/psync.log` file.
 
 ## Command line options quick summary
