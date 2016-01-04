@@ -2,11 +2,11 @@
 psync is a realtime, two-way syncronization utility written in Python
 
 ## Summary
+[How it works](https://github.com/shodanshok/psync#how-it-works)  
+[Repository content and file structure](https://github.com/shodanshok/psync#repository-content-and-file-structure)  
 [Usage](https://github.com/shodanshok/psync#usage)  
-[How it works]  
-[Repository content and file structure]  
-[Command line options summary]  
-[Command line options explained]  
+[Command line options summary](https://github.com/shodanshok/psync#command-line-options-quick-summary)  
+[Command line options explained](https://github.com/shodanshok/psync#command-line-options-explained)  
 [Config file notes]  
 [FAQ]  
 
