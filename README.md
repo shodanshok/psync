@@ -10,9 +10,11 @@ Psync is a realtime, two-way syncronization utility written in Python
 [FAQ]
 
 ## How it works
-The basic idea is that, using inotify, one should be able to synchronize in (more or less) realtime two directory subtree, being on the same server or two different ones. This idea is not a new concept after all - utilities as lsyncd already accomplished this task.
+The basic idea is that, using inotify, one should be able to synchronize in (more or less) realtime two directory subtree (called *left* and *right* in this document), being on the same server or two different ones. This idea is not a new concept after all - utilities as lsyncd already accomplished this task.
 
 What make Psync different is that it is a *two-way* synchronization tool, so that you can create/edit/rename files and directories on *both* replica sides, with Psync keeping the two sets aligned. Moreover, being a (quasi) realtime synchronization, it avoid the unpleasant manage of the conflicting/deleted file repository/history (DSFR users anyone?)
+
+For more information on *why* I really had to write Psync, give a look at the FAQ entries.
 
 ## Usage
 `psync.py -r remotehost \<srcroot\> \<dstroot\>`  
