@@ -1,0 +1,9 @@
+#!/bin/bash
+files=`find . -iname "*.py"`
+
+pylint $files --disable=anomalous-backslash-in-string \
+    --disable=bare-except --disable=redefined-outer-name \
+    --disable=unused-variable --disable=missing-docstring --disable=R \
+    --disable=invalid-name --disable=relative-import --reports=n
+
+exit $?

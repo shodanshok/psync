@@ -1,0 +1,10 @@
+#!/bin/bash
+dst=$1
+for file in `ls`; do
+    if [ "$file" == "diff" ]; then
+        continue
+    fi
+    echo "COMPARING file $file to $dst/$file"
+    diff "$file" "$dst/$file"
+    echo -n
+done

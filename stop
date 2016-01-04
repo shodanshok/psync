@@ -1,0 +1,24 @@
+#!/bin/bash
+# Load common code
+source /root/scripts/psync/conf/config.sh
+# Load customer information
+source ../customer_info
+
+logfile="$logdir/psync.log"
+
+# Remote pid
+rpid=`ps ax | grep filter.py | grep ssh | grep -o "^[[:space:]]*[[:digit:]]\+"`
+if [ -z "$rpid" ]; then
+    remote=/bin/false
+else
+    remote=/bin/true
+fi
+
+# Stopping
+echo "STOPPING PSYNC" >> $logfile
+/usr/bin/killall -q psync.py filter.py cinotify >>$logfile 2>>$logfile
+$remote && /usr/bin/kill $rpid
+sleep 1
+
+# Be really sure
+/usr/bin/killall -9 -q psync.py filter.py cinotify >>$logfile 2>>$logfile

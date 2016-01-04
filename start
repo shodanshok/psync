@@ -1,0 +1,24 @@
+#!/bin/bash
+# Load common code
+source /root/scripts/psync/conf/config.sh
+# Load customer information
+source ../customer_info
+
+logfile="$logdir/psync.log"
+exitfile="$logdir/psync.exitcode"
+options="-k -d 2 -r slave.assyoma.it /opt/fileserver/Fileserver /opt/fileserver/Fileserver"
+
+running=`ps ax | grep python | grep psync.py | grep -v grep | wc -l`
+if [ $running -gt 0 ]; then
+    echo "PSYNC is already running"
+    exit 1
+fi
+
+# Close stdout and stderr
+exec 1>&-
+exec 2>&-
+
+# Start
+rm -f $exitfile
+echo -e "\n\n\nSTARTING PSYNC with the following options: $options" >> $logfile
+(./psync.py $options >>$logfile 2>>$logfile & wait $!; echo $? > $exitfile) &

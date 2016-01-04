@@ -1,0 +1,64 @@
+#!/bin/bash
+# Load common code
+source /root/scripts/psync/conf/config.sh
+# Load customer information
+source ../customer_info
+
+extra=""
+while getopts ":l" opt; do
+    case $opt in
+        l)
+        extra+="-l"
+        lite="true"
+        ;;
+        \?)
+        ;;
+    esac
+done
+
+send_mail=1
+lastcode=1
+logfile="$logdir/psync-$script.lastrun"
+mailcmd_notice="mail -r $FROM -s NOTICE:PSYNC:$CUSTOMER_NAME:$HOSTNAME $RCPT"
+mailcmd_alert="mail -r $FROM -s ALERT:PSYNC:$CUSTOMER_NAME:$HOSTNAME $RCPT"
+mailcmd_warning="mail -r $FROM -s WARNING:PSYNC:$CUSTOMER_NAME:$HOSTNAME $RCPT"
+options="$extra -r slave.assyoma.it /opt/fileserver /opt/fileserver"
+
+# If a full check is running, exit
+if [ "$lite" == "true" ]; then
+    running=`ps ax | grep "psync/check" | grep -v grep`
+    running=`echo -n "$running" | wc -l`
+    if [ $running -gt 1 ]; then
+        exit
+    fi
+fi
+
+# Determine if we need to send and email
+if [ "$lite" == "true" ] && [ -e $logfile ]; then
+    lastcode=`grep "EXIT CODE:" $logfile | grep -o "[[:digit:]]\+"`
+    if [ -z "$lastcode" ]; then
+        lastcode=1
+    fi
+else
+    lastcode=1
+fi
+
+# Check
+date > $logfile
+output=`./rcheck.py $options`
+error=$?
+echo "EXIT CODE: $error" >> $logfile
+
+# Error reporting
+if [ $error -gt 0 ] && [ $lastcode -gt 0 ]; then
+    if [ $error -eq 1 ] || [ $error -eq 2 ]; then
+        mailcmd=$mailcmd_warning
+    elif [ $error -eq 3 ]; then
+        mailcmd=$mailcmd_alert
+    elif [ $error -eq 4 ]; then
+        mailcmd=$mailcmd_notice
+    fi
+    mailobj="Scheduled comparision detected some unexpected differences\nPlease check them manually"
+    mailobj="$mailobj\n$output"
+    send_email
+fi

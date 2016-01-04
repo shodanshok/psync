@@ -1,0 +1,38 @@
+#!/bin/bash
+# Load common code
+source /root/scripts/psync/conf/config.sh
+# Load customer information
+source ../customer_info
+
+send_mail=1
+logfile="$logdir/psync-$script.lastrun"
+psyncfile="$logdir/psync.log"
+exitfile="$logdir/psync.exitcode"
+mailcmd_error="mail -r $FROM -s ERROR:PSYNC:$CUSTOMER_NAME:$HOSTNAME $RCPT"
+date > $logfile
+result=`ps ax -F | grep "psync.py\|filter.py\|cinotify" | grep -v "grep" | wc -l`
+
+# Grep exitcode
+if [ -e $exitfile ]; then
+    exit_code=`cat $exitfile`
+else
+    exit_code=-1
+fi
+
+# Grep some log lines
+if [ -e $logfile ]; then
+    loglines=`tail -n 20 $psyncfile | grep -o "[[:print:]]*"`
+else
+    loglines=""
+fi
+
+# If something is wrong, send email and restart
+if [ $result -lt 4 ]; then
+    mailcmd=$mailcmd_error
+    mailobj="PSYNC is not running and/or has some problem.\nExit code: $exit_code\n\nRestarting...\n\n"
+    mailobj+="Latest log lines:\n"
+    mailobj+="$loglines"
+    ./stop
+    ./start
+    send_email
+fi

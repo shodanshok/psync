@@ -1,0 +1,310 @@
+#!/usr/bin/python2
+
+import collections
+import subprocess
+import threading
+import optparse
+import inspect
+import hashlib
+import time
+import sys
+import os
+import re
+
+# Custom imports
+sys.dont_write_bytecode = True
+from libs import utils
+from libs import config
+
+# Dequeues
+raw_queue = collections.deque() #raw events
+actions = collections.deque() #method,itemtype,dir,file,dstfile
+
+def parse_options():
+    parser = optparse.OptionParser()
+    parser.add_option("-d", "--debug", dest="debug", type="int",
+                      help="Enable debugger", action="store",
+                      default=config.debug)
+    parser.add_option("-t", "--tempfiles", dest="tempfiles", action="store",
+                      help="Tempfile list (regex)", default=config.tempfiles)
+    parser.add_option("-e", "--excludes", dest="excludes", action="store",
+                      help="Excluded files (regex)", default=config.excludes)
+    parser.add_option("-k", "--kill", dest="kill", action="store_true",
+                      help="Kill other inotify processes", default=False)
+    parser.add_option("-i", "--interval", dest="interval", action="store",
+                      type="int",
+                      help="Interval between event collection/notification",
+                      default=config.event_interval)
+    parser.add_option("-T", "--translate", dest="translate",
+                      help="Translate/replace path element", action="store",
+                      default=config.translate)
+    parser.add_option("--srcroot", dest="srcroot",
+                      action="store", default=None)
+    (options, args) = parser.parse_args()
+    # Define base dirs
+    options.srcroot = utils.normalize_dir(options.srcroot)
+    options.psyncdir = utils.normalize_dir(options.srcroot+config.psyncdir)
+    return (options, args)
+
+def log(severity, message):
+    caller = inspect.stack()[1][3]
+    thread = threading.current_thread()
+    utils.log(severity, "U", message, options.debug, caller, thread)
+
+def dequeue():
+    while True:
+        try:
+            action = actions.popleft()
+            # Delay interval time
+            if time.time() - action['timestamp'] >= options.interval:
+                if action['file'] != heartfile:
+                    log(utils.DEBUG3, "LV1 action: "+str(action))
+                # Are we sure to delete?
+                if action['method'] == "DELETE":
+                    if os.path.exists(action['file']):
+                        log(utils.DEBUG2,
+                            "LV1 event: change from DELETE to RSYNC " +
+                            "for file: " + action['file'])
+                        action['method'] = "RSYNC"
+                # Is the to-be-synched file a valid one?
+                if action['method'] == "RSYNC":
+                    if not os.path.exists(action['file']):
+                        log(utils.DEBUG2,
+                            "LV1 event: skipping stale RSYNC event " +
+                            "for file: "+action['file'])
+                        continue
+                    # Was the file really modified?
+                    if (time.time() - os.stat(action['file']).st_ctime >
+                            max((options.interval*2)+1, 60)):
+                        log(utils.DEBUG2,
+                            "LV1 event: skipping non-modifying RSYNC event " +
+                            "for file: "+action['file'])
+                        continue
+                line = (action['method'] + config.separator +
+                        action['itemtype'] + config.separator +
+                        action['dir'] + config.separator +
+                        str(action['file']) + config.separator +
+                        str(action['dstfile']))
+                checksum = hashlib.md5(line).hexdigest()
+                print line + config.separator + checksum
+                sys.stdout.flush()
+            else:
+                actions.appendleft(action)
+                time.sleep(options.interval -
+                           (time.time() - action['timestamp']))
+        except:
+            touch(heartfile)
+            time.sleep(1)
+
+def prepare_system():
+    create_psyncdir()
+    subprocess.Popen(["sysctl", "-q", "-w", "fs.inotify.max_user_watches=" +
+                      str(16*1024*1024)]).communicate()
+    subprocess.Popen(["sysctl", "-q", "-w", "fs.inotify.max_queued_events=" +
+                      str(512*1024)]).communicate()
+    if options.kill:
+        tokill = os.path.basename(config.inotifybin)
+        subprocess.Popen(["killall", "-q", tokill]).communicate()
+
+def launch_inotify():
+    # Force disable debug
+    try:
+        config.inotify_extra.remove("-d")
+    except:
+        pass
+    # Prepare process
+    process = subprocess.Popen([config.inotifybin] + config.inotify_extra +
+                               [options.srcroot], stdout=subprocess.PIPE,
+                               bufsize=1)
+    return process
+
+def read_inotify():
+    while True:
+        line = inotify.stdout.readline()
+        raw_queue.append(line)
+
+def sanitize_path(path):
+    if path[:1] == config.separator[-1:] or path[-1:] == config.separator[:1]:
+        return False
+    else:
+        return True
+
+def safeline(line):
+    # Check for bad formed line
+    if line.count(config.separator) != 4:
+        log(utils.WARNING, "Strange line (type S1): "+line)
+        return False
+    # Check for sane path/file names
+    event, dirname, filename, dstfile, end = utils.deconcat(line,
+                                                            config.separator,
+                                                            False)
+    if not sanitize_path(dirname) or not sanitize_path(filename):
+        log(utils.WARNING, "Strange line (type S2): "+line)
+        return False
+    # If all it's ok, return success
+    return True
+
+def inotifylog(line):
+    if line.startswith("error:"):
+        log(utils.WARNING, line)
+        return True
+    if line.startswith("info:"):
+        log(utils.DEBUG1, line)
+        return True
+
+def translate(line):
+    original = line
+    frompath, topath = utils.deconcat(options.translate, config.separator)
+    if topath == "None":
+        topath = ""
+    if line.find(frompath) >= 0:
+        translated = True
+        line = line.replace(frompath, topath)
+        log(utils.DEBUG2, "Translate: " + original + " -> " + line)
+    else:
+        translated = False
+    return translated, original, line
+
+def parse_line(line):
+    line = line.rstrip("\n")
+    # Check if it's an inotify logline
+    if inotifylog(line):
+        return
+    # Check for safety
+    if not safeline(line):
+        return
+    log(utils.DEBUG2, "Raw EVENT: "+line)
+    # Translate and re-check for safety
+    if options.translate:
+        translated, original, line = translate(line)
+        if not safeline(line):
+            return
+    else:
+        translated = False
+    # If safe, go ahead
+    event, dirname, filename, dstfile, end = utils.deconcat(line,
+                                                            config.separator,
+                                                            False)
+    # Item identification
+    dirname = utils.normalize_dir(dirname)
+    if event.find(",ISDIR") >= 0:
+        itemtype = "DIR"
+        filename = utils.normalize_dir(filename)
+        dstfile = utils.normalize_dir(dstfile)
+    else:
+        itemtype = "FILE"
+    event = utils.deconcat(event, ",")[0]
+    # Select sync method and skip unwanted events
+    if event == "CREATE" and itemtype == "DIR":
+        log(utils.DEBUG2, "Skipping uninteresting event for "+filename)
+        return
+    if event.find("SELF") >= 0:
+        log(utils.DEBUG2, "Skipping uninteresting event for "+filename)
+        return
+    # Method selection
+    if (event == "ATTRIB" or event == "CREATE" or event == "CLOSE_WRITE" or
+            event == "MODIFY"):
+        method = "RSYNC"
+    # MOVE handling
+    elif event == "MOVED_FROM" or event == "MOVED_TO":
+        return
+    elif event == "MOVE":
+        method = "MOVE"
+    # DELETE and undefined method
+    elif event == "DELETE":
+        method = "DELETE"
+    else:
+        log(utils.DEBUG2, "Skipping uninteresting event for "+filename)
+        return
+    # If event if for tempfile, ignore it
+    if re.search(options.tempfiles, dstfile, re.I):
+        log(utils.DEBUG2, "Skipping event for tempfile "+dstfile)
+        return
+    else:
+        # If source was a tempfile but destination is a normal file, use RSYNC
+        if re.search(options.tempfiles, filename, re.I):
+            method = "RSYNC"
+            filename = dstfile
+            log(utils.DEBUG2, "Changing method from MOVE to RSYNC " +
+                "for tempfile " + filename)
+    # If event is from/to excluded files, ignore it
+    if (re.search(options.excludes, filename.rstrip("/"), re.I) or
+            re.search(options.excludes, dstfile.rstrip("/"), re.I)):
+        log(utils.DEBUG2, "Skipping event for excluded path "+filename)
+        return
+    # Be EXTRA CAREFUL to skip the safesuffix
+    if (re.search(config.safesuffix, filename.rstrip("/"), re.I) or
+            re.search(config.safesuffix, dstfile.rstrip("/"), re.I)):
+        log(utils.DEBUG2, "Skipping event for excluded path "+filename)
+        return
+    # If it was a translated line, only allow RSYNC method
+    if translated and not method == "RSYNC":
+        log(utils.DEBUG2, "Skipping non-rsync method for translated line")
+        return
+    # Coalesce and append actions
+    entry = {'method':method, 'itemtype':itemtype, 'dir':dirname,
+             'file':filename, 'dstfile':dstfile, 'timestamp':time.time()}
+    # Coalesce and append actions
+    try:
+        prev = actions.pop()
+    except:
+        prev = False
+    if prev:
+        if method == prev['method'] and filename == prev['file']:
+            # If method is RSYNC, use the previous timestamp
+            # This will prevent to the delayed dequeue code
+            # to excessively delay RSYNC events
+            if method == "RSYNC":
+                entry['timestamp'] = prev['timestamp']
+            else:
+                pass
+        elif (method == "RSYNC" and prev['method'] == "DELETE" and
+              filename == prev['file']):
+            pass
+        else:
+            actions.append(prev)
+    actions.append(entry)
+
+def touch(filename):
+    fd = open(filename, "w")
+    fd.close()
+
+def create_psyncdir():
+    if not os.path.exists(options.psyncdir):
+        os.makedirs(options.psyncdir)
+        time.sleep(1)
+
+# Parse options
+(options, args) = parse_options()
+heartfile = options.psyncdir+config.heartfile
+# Prepare system
+prepare_system()
+# Launch pipe to inotify
+inotify = launch_inotify()
+# Read events as fast as possible
+producer = threading.Thread(name="producer", target=read_inotify)
+producer.daemon = True
+producer.start()
+# Analyze and coalesce changes
+consumer = threading.Thread(name="consumer", target=dequeue)
+consumer.daemon = True
+consumer.start()
+
+# Main thread
+while True:
+    parse = False
+    # Check if inotify is terminated
+    if inotify.poll():
+        quit(1)
+    # Check if psyncdir must be created
+    create_psyncdir()
+    # Try reading
+    try:
+        line = raw_queue.popleft()
+        parse = True
+    # If not ready, wait one second
+    except:
+        time.sleep(1)
+    # If I have a line, parse it
+    if parse:
+        parse_line(line)
