@@ -122,3 +122,39 @@ This option skips launch-time full synchronization. Usefull when you know that y
 
 **`-f, --force`**  
 Normally, psync will refuse to delete non-empty directory, or move a directory when it's target is another non-empty directory. This option will *force* psync to complete the above operation on non-empty directory. Please note that in normal usage scenario you don't need to force anything, so use this option only if you know what are you doing.
+
+## Config file notes
+psync config files define various default parameters and give access to some internal configuration values. It is nothing more than a python file which is included in all the other python scripts. The main configuration parameters are:
+
+**`safesuffix=`** this is the default safesuffix (ie: ignored filename) used for the rename-dance by the `helpers.py` script  
+**`debug=`** the default debug level [0, 1, 2, 3]  
+**`event_interval=`** define the time (in seconds) between event collection and aknowledge by `filter.py`. After the specified time, events are forwarded to `psync.py` which will propagate them [number]  
+**`force=`** default force setting [0, 1]  
+**`dryrun=`** only simulate event propagation [True, False]  
+**`first_sync_only=`** synchronize the two replica set and then exit [True, False]  
+**`skip_initial_sync=`** skip initial synchronization [True, False]  
+**`banned=`** banned program name [string]  
+**`translate=`** default translate string (does not use it unless you **really** know what are you doing) [string]  
+**`rsync_excludes=`** rsync file exclusion [list]  
+**`rsync_extra=`** rsync extra options [list]  
+**`inotify_extra=`** cinotify extra options [list]  
+**`tempfiles=`** identifies temporary files [regex]  
+**`excludes=`** to-be-ignored files [regex]  
+**`separator=`** `cinotify` use this separator as field-delimiter. It should be a character (or string) which will not be used in legal file names (as default, I used the ':' character as it is not allowed on Windows nor on SMB/CIFS shares) [string]  
+**`fast_sync_interval=`** fast sync interval, in seconds [number]  
+**`fast_sync_merge=`** if set to False, fast sync will never create new files on the replica partner (but it update existing files). If set to True, it will propagate (eventual) new files to the replica partner [True, False]  
+**`full_sync_interval=`** full sync interval, in seconds [number]  
+**`full_sync_merge=`** if set to False, full sync will never create new files on the replica partner (but it update existing files). If set to True, it will propagate (eventual) new files to the replica partner [True, False]  
+**`fullmerge=`** is an array containing the time of the day (expressed in hours) when a full, complete replication (with new files and ACLs propagated) will be executed. If you want no such replication, leave it empty or set an unrealistic value (eg: 99) [array]  
+**`pending_lifetime=`** maximum time, in seconds, meanwhile an identical received events will be treated as a backfired event (ie: ignored) [number]  
+**`pending_events=`** events to be tracked for backfiring [string]  
+**`ssh_options=`** default SSH options [string]  
+**`rsync_event_recurse=`** if set, rsync will use recursive scan by default (use only if you really know what are you doing)  
+**`alert_threshold=`** threshould over which the scheduled checks done via `rcheck.py` will signal an alarm  
+**`warning_threshold=`** threshould over which the scheduled checks done via `rcheck.py` will signal a warning  
+**`rsync_style=`** how to thread synchronization (ie: CREATE, CLOSE_WRITE) events. If set to 1, backfired sync events will be re-issued to the replication partner with "safe" rsync settings (ie: --existing). If set to 2, backfired sync event will be ignored for the duration of `pending_lifetime`. If set to 3, all rsync events will be batched for later execution [1, 2, 3]  
+**`acl_from_left_only=`** is set to True, ACLs will be set only from left to right. If set to False, ACLs can be set from right to left also (but be sure to read the ACCESS LIST paragraph first).  
+**`timeout=`** general timeout (in seconds), used as a base for other timeouts [number]  
+**`itimeout=`** initial cinotify timeout, in seconds [number]  
+**`etimeout=`** execute (for event propagation) timeout (in seconds) [number]  
+**`maxtimeout=`** max connection timeout (in seconds). After this timer expires, psync will die and exit  
