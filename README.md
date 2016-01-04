@@ -4,6 +4,7 @@ psync is a realtime, two-way syncronization utility written in Python
 ## Summary
 [Usage](https://github.com/shodanshok/psync#usage)  
 [How it works]  
+[Repository content and file structure]  
 [Command line options summary]  
 [Command line options explained]  
 [Config file notes]  
@@ -49,7 +50,7 @@ L: MOVE test.txt test.txt.9876.psync.ignore (temporary scratch file, this event 
 L: MOVE test.txt.9876.psync.ignore new.txt (as the source filename is excluded, this event will be skipped)  
 *Result:* the file is moved/renamed on remote partner without any backired event  
 
-## File structure
+## Repository content and file structure
 In order to perform well in low-bandwidth, high latency link, psync is composed of a centralized, left-only "brain" called `psync.py` and decentralized `filter.py`, `helpers.py` and `cinotify` files. In addition, I wrote some (rather crude) shell wrapper to start/stop it and to check replication correctness. These wrapper are nor elegant nor polished, by they accomplish their work. You are free to contribute with better "glue code" (and to enhance/rewrite/refactor the core code also!).  
 
 Some more in-depth information:
