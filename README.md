@@ -51,7 +51,7 @@ L: MOVE test.txt.9876.psync.ignore new.txt (as the source filename is excluded, 
 *Result:* the file is moved/renamed on remote partner without any backired event  
 
 ## Repository content and file structure
-In order to perform well in low-bandwidth, high latency link, psync is composed of a centralized, left-only "brain" called `psync.py` and decentralized `filter.py`, `helpers.py` and `cinotify` files. In addition, I wrote some (rather crude) shell wrapper to start/stop it and to check replication correctness. These wrapper are nor elegant nor polished, by they accomplish their work. You are free to contribute with better "glue code" (and to enhance/rewrite/refactor the core code also!).  
+In order to perform well in low-bandwidth, high latency link, psync is composed of a centralized, left-only "brain" called `psync.py` and decentralized `filter.py`, `helpers.py` and `cinotify` files. In addition, I wrote some (rather crude) shell wrapper to start/stop it and to check replication correctness. These wrapper are nor elegant nor polished, by they accomplish their work. You are welcome to contribute with better "glue code" (and to enhance/rewrite/refactor the core code also!).  
 
 Some more in-depth information:
 
@@ -61,13 +61,15 @@ Some more in-depth information:
 **`libs/helpers.py`** is a small collection of helpers functions. Helpers are the small programs needed to manage the rename-dance necessary to avoid events to be backfired. Feel free to issue `libs/helpers.py --help` to have more information.  
 **`libs/utils.py`** contain various shared utility functions  
 **`libs/config.py`** is psync's configuration file (more on that later)  
+**`conf/`** this directory contains various configuration files for other subsystem (eg: bash, logrotate, cron, ecc). It also symlink `libs/config.py`  
 **`start, stop, check and runcheck`** are some (crude) shell wrapper used to start/stop/check psync operations
 
 
 ## Usage
 `psync.py -r remotehost \<srcroot\> \<dstroot\>`  
 *Example:* `psync -r slave.assyoma.it /opt/fileserver /opt/fileserver`  
-*Note:* psync (and I means *all* the psync tree, not only the psync.py file) should be installed on both sides (left and right)
+*Note:* psync (and I means *all* the psync tree, not only the psync.py file) should be installed on both sides (left and right)  
+By default, logs will be written inside `/var/log/psync/psync.log` file.
 
 ## Command line options quick summary
 **`-h, --help`** show this help message and exit  
