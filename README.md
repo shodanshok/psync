@@ -67,7 +67,7 @@ Some more in-depth information:
 ## Usage
 `psync.py -r remotehost \<srcroot\> \<dstroot\>`  
 *Example:* `psync -r slave.assyoma.it /opt/fileserver /opt/fileserver`  
-*Note:* psync should be installed on both sides (left and right)
+*Note:* psync (and I means *all* the psync tree, not only the psync.py file) should be installed on both sides (left and right)
 
 ## Command line options quick summary
 **`-h, --help`** show this help message and exit  
