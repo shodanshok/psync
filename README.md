@@ -69,7 +69,7 @@ Some more in-depth information:
 `psync.py -r remotehost \<srcroot\> \<dstroot\>`  
 *Example:* `psync -r slave.assyoma.it /opt/fileserver /opt/fileserver`  
 *Note:* psync (and I means *all* the psync tree, not only the psync.py file) should be installed on both sides (left and right)  
-**Note:** as psync will use SSH to propagate events, you *need* to setup pubkey based automatic login
+*Note:* as psync will use SSH to propagate events, you *need* to setup pubkey based automatic login
 By default, logs will be written inside `/var/log/psync/psync.log` file.
 
 ## Command line options quick summary
