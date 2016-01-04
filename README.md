@@ -12,9 +12,45 @@ Psync is a realtime, two-way syncronization utility written in Python
 ## How it works
 The basic idea is that, using inotify, one should be able to synchronize in (more or less) realtime two directory subtree (called *left* and *right* in this document), being on the same server or two different ones. This idea is not a new concept after all - utilities as lsyncd already accomplished this task.
 
-What make Psync different is that it is a *two-way* synchronization tool, so that you can create/edit/rename files and directories on *both* replica sides, with Psync keeping the two sets aligned. Moreover, being a (quasi) realtime synchronization, it avoid the unpleasant manage of the conflicting/deleted file repository/history (DSFR users anyone?)
+What make Psync different is that it is a *two-way* synchronization tool, so that you can create/edit/rename files and directories on *both* replica sides, with Psync keeping the two sets aligned. Moreover, being a (quasi) realtime synchronization, it avoid the unpleasant managing of the conflicting/deleted file repository/history (DSFR users anyone?)
 
-For more information on *why* I really had to write Psync, give a look at the FAQ entries.
+A significant problem in concurrent, two-way replication is to identify which events must be propagated and which one should be discarded. Let assume a naive propagate-all-events approach: after a left-generated event is replicated on the right side, *an identical event will be immediately propagated from right to left.* The reason is quite simple: the right instance has no means to differentiate between left-induced events and locally (genuine) generated ones. Obviously, events should not be fired back to their source. This can not only results in an event loop (event is propagated left->right, then right->left, and so on) but it is a data-loss prone scenario.  
+
+This can be fixed only with a "central brain" which coordinate events and filter them. This is one of the key reason why I had to write Psync. For more information about that topic, give a look at the FAQ entries.
+
+**HOW EVENTS ARE COLLECTED AND PROPAGATED**  
+As stated above, events are collected using [inotify](http://linux.die.net/man/7/inotify). After being collected, events are queued and issued to the replication partner. The partner apply them in a manner that avoid re-catching (and re-propagating) events back to source; this is accomplished by ad-hoc rules excluding certain "protected" filename/suffixes (eg: "psync.ignore") that Psync know to ignore, avoiding sending back the event to its source.
+
+Sending data is accomplished via [rsync](https://rsync.samba.org/), which need to be installed on both partners. Moves and deletion are accomplished via a custom helper script. In particular, moves are executed without needing to re-transfer any data (most of the times).
+
+Below you can find some event propagation examples. **L** and **R** means left and right, respectively.
+
+*CREATE and CLOSE_WRITE*  
+L: CREATE test.txt  
+L: CLOSE_WRITE test.txt  
+*... wait some seconds ...*
+R: CREATE .test.txt.ABCDEF (temporary rsynch file; this event will be skipped)  
+R: CLOSE_WRITE .test.txt.ABCDEF (temporary rsynch file; this event will be skipped)  
+R: MOVE .test.txt.ABCDEF test.txt (as the source filename is excluded, this event will be skipped)  
+*Result:* the file is pushed to the remote partner without any backired event  
+
+*DELETE*  
+L: DELETE test.txt  
+*... wait some seconds ...*  
+L: if file test.txt is not found (ie: it was really deleted), propagate the event  
+R: MOVE test.txt test.txt.1234.psync.ignore (temporary scratch file, this event will be skipped)  
+R: DELETE test.txt.1234.psync.ignore (temporary scratch file, this event will be skipped)  
+*Result:* the file deleted from remote partner without any backired event  
+
+*MOVE*  
+L: MOVE test.txt new.txt  
+*... wait some seconds ...*  
+L: MOVE test.txt test.txt.9876.psync.ignore (temporary scratch file, this event will be skipped)  
+L: MOVE test.txt.9876.psync.ignore new.txt (as the source filename is excluded, this event will be skipped)  
+*Result:* the file is moved/renamed on remote partner without any backired event  
+
+
+In order 
 
 ## Usage
 `psync.py -r remotehost \<srcroot\> \<dstroot\>`  
