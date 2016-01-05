@@ -97,7 +97,7 @@ def log(severity, source, message, debug=config.debug,
         if severity > INFO:
             sys.stderr.write(logline+"\n")
         else:
-            print logline
+            print logline+"\n",
             sys.stdout.flush()
 
 def execute(cmd, source, stdin, warn=True, timeout=False, heartbeats=False,

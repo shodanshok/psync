@@ -86,7 +86,7 @@ def dequeue():
                         str(action['file']) + config.separator +
                         str(action['dstfile']))
                 checksum = hashlib.md5(line).hexdigest()
-                print line + config.separator + checksum
+                print line + config.separator + checksum + "\n",
                 sys.stdout.flush()
             else:
                 actions.appendleft(action)
@@ -146,7 +146,8 @@ def safeline(line):
 
 def inotifylog(line):
     if line.startswith("error:"):
-        log(utils.WARNING, line)
+        if not line.find(config.safesuffix):
+            log(utils.WARNING, line)
         return True
     if line.startswith("info:"):
         log(utils.DEBUG1, line)
