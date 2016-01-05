@@ -59,7 +59,7 @@ def check(src, dst):
     count = 0
     for line in output.split("\n"):
         if (len(line) > 0 and
-                (line[0] == "<" or line[0] == ">" or line[0] == "c")):
+                (line[0] == "<" or line[0] == ">")):
             if options.lite and line[2] != "+":
                 continue
             changed = changed + " " + line + "\n"
