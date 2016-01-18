@@ -54,7 +54,7 @@ acl_from_left_only = True
 # Timeouts
 timeout = 60                # General timeout
 itimeout = timeout*5        # Initial inotify timeout
-etimeout = timeout-45       # Execute timeout
+etimeout = timeout-15       # Execute timeout
 maxtimeout = timeout*15     # Max connection timeout (abort)
 
 # Schedules
