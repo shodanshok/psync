@@ -6,7 +6,7 @@ source ../customer_info
 
 logfile="$logdir/psync.log"
 exitfile="$logdir/psync.exitcode"
-options="-k -d 2 -r slave.assyoma.it /opt/fileserver/Fileserver /opt/fileserver/Fileserver"
+options="-k -d 2 -r slave.assyoma.it /opt/fileserver/test /opt/fileserver/test"
 
 running=`ps ax | grep python | grep psync.py | grep -v grep | wc -l`
 if [ $running -gt 0 ]; then

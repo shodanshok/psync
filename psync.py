@@ -872,12 +872,31 @@ while True:
         if type(pid) is not int:
             continue
         if timedout(['execute', pid]):
+            # Try to grecefully terminate
             process = heartbeats['execute'][pid]['process']
-            process.kill()
-            heartbeats['execute'].pop(pid, None)
-            log(utils.WARNING, "B",
+            try:
+                process.terminate()
+            except:
+                pass
+            log(utils.INFO, "B",
                 "SLOW PROCESS WITH PID " + str(pid) +
-                " KILLED: " + str(process))
+                " TERMINATED: " + str(process))
+            # Wait some seconds
+            time.sleep(5)
+            # If process terminated, continue
+            if process.poll():
+                continue
+            else:
+                # else, kill it
+                try:
+                    process.kill()
+                except:
+                    pass
+                log(utils.WARNING, "B",
+                    "SLOW PROCESS WITH PID " + str(pid) +
+                    " KILLED: " + str(process))
+            # Remove process PID from list
+            heartbeats['execute'].pop(pid, None)
     # If connections establishment is impossible, quit
     if timedout("L", heart_field='truelast', timeout_field="maxtimeout"):
         log(utils.FATAL, "L",
