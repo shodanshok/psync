@@ -791,7 +791,8 @@ def search_banned():
             quit(1)
 
 
-def timedout(names, attempts=1, heart_field="last", timeout_field="timeout"):
+def timedout(names, attempts=1, heart_field="last", timeout_field="timeout",
+             grace=0):
     heartbeat = heartbeats
     # Select correct heartbeat
     if type(names) is not list:
@@ -803,7 +804,7 @@ def timedout(names, attempts=1, heart_field="last", timeout_field="timeout"):
     if not timeout:
         return False
     # Check if timedout
-    if time.time() - heartbeat[heart_field] >= (timeout * attempts):
+    if time.time() - heartbeat[heart_field] >= (timeout * attempts) + grace:
         return True
     else:
         return False
@@ -869,11 +870,25 @@ while True:
         busylocks = 0
     # Check for (and kill) slow processes
     for pid in heartbeats['execute'].keys():
+        # If pid is not numeric, something is wrong. Continue with next process
         if type(pid) is not int:
             continue
-        if timedout(['execute', pid]):
-            # Try to grecefully terminate
-            process = heartbeats['execute'][pid]['process']
+        # If process was terminated/killed, remove it from list and continue
+        process = heartbeats['execute'][pid]['process']
+        if process.poll():
+            heartbeats['execute'].pop(pid, None)
+            continue
+        # If the process does not terminate, kill it
+        if timedout(['execute', pid], grace=5):
+            try:
+                process.kill()
+            except:
+                pass
+            log(utils.WARNING, "B",
+                "SLOW PROCESS WITH PID " + str(pid) +
+                " KILLED: " + str(process))
+        # Try to gracefully terminate the process
+        elif timedout(['execute', pid]):
             try:
                 process.terminate()
             except:
@@ -881,22 +896,6 @@ while True:
             log(utils.INFO, "B",
                 "SLOW PROCESS WITH PID " + str(pid) +
                 " TERMINATED: " + str(process))
-            # Wait some seconds
-            time.sleep(5)
-            # If process terminated, continue
-            if process.poll():
-                continue
-            else:
-                # else, kill it
-                try:
-                    process.kill()
-                except:
-                    pass
-                log(utils.WARNING, "B",
-                    "SLOW PROCESS WITH PID " + str(pid) +
-                    " KILLED: " + str(process))
-            # Remove process PID from list
-            heartbeats['execute'].pop(pid, None)
     # If connections establishment is impossible, quit
     if timedout("L", heart_field='truelast', timeout_field="maxtimeout"):
         log(utils.FATAL, "L",
