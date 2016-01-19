@@ -26,6 +26,7 @@ PSUCCESS = 0
 PERROR = 1
 PSOFTERROR = 100
 RSYNC_SUCCESS = [0, 23, 24]
+RSYNC_TERMINATED = 20
 ##################
 
 def inv(number):

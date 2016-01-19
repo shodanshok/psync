@@ -26,13 +26,14 @@ first_sync_only = False
 skip_initial_sync = True
 banned = None
 translate = None #translate = "____archive____/|None"
-rsync_excludes = [".psync", "*.psync.ignore", "____archive____", ".*.??????",
-                  "*.symlink", "*.tmp", "*.TMP", "*.~tmp~", "Thumbs.db", "~$*"]
+rsync_excludes = [".psync", "*.psync.ignore", "*.rsync-partial", ".*.??????",
+                  "____archive____", "*.symlink", "*.tmp", "*.TMP", "*.~tmp~",
+                  "Thumbs.db", "~$*"]
 rsync_extra = ["-L", "--timeout=10", "--max-size=90M"]
 inotify_extra = ["-E", "____archive____", "-q", "-s"]
 tempfiles = "\.tmp$|\.~tmp~|/~\$"
-excludes = (".psync.ignore|/____archive____/|/\..*\.......$|\.symlink$" +
-            "|/Thumbs.db$")
+excludes = (".psync.ignore|.rsync-partial|/\..*\.......$|/____archive____/" +
+            "|\.symlink$|/Thumbs.db$")
 
 # Internal configuration
 psyncdir = normalize_dir(".psync")

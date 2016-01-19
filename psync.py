@@ -310,7 +310,8 @@ def move(action):
     # After the move, do a recursive check with rsync
     action['method'] = "RSYNC"
     action['filelist'] = action['dstfile']
-    rsync(action, recurse=True)
+    action['recurse'] = True
+    rsync(action)
 
 
 def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True):
@@ -320,7 +321,7 @@ def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True):
     rsync_options = []
     if action['backfired']:
         rsync_options.append("--existing")
-    if recurse:
+    if recurse or action['recurse']:
         rsync_options.append("-r")
     if acl and (action['source'] == "L" or not config.acl_from_left_only):
         rsync_options.append("-AX")
@@ -341,8 +342,10 @@ def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True):
         eventid=action['eventid'])
     cmd = (["rsync", "-aiu"] + options.rsync_extra + rsync_options +
            ["-u", "--files-from=-"] + excludelist + [left, right])
-    execute(cmd, action['source'], filelist, warn=warn,
-            eventid=action['eventid'])
+    (process, output, error) = execute(cmd, action['source'], filelist,
+                                       warn=warn, eventid=action['eventid'])
+    if process.returncode == utils.RSYNC_TERMINATED:
+        actions.append(action)
 
 
 def full_syncher(oneshot=False):
@@ -769,7 +772,8 @@ def reader(process, source="B"):
             "Current merges: " + str(state['current_merges']))
         entry = {'source': source, 'method': method, 'itemtype': itemtype,
                  'filelist': filelist, 'dstfile': dstfile,
-                 'eventid': checksum[-5:], 'backfired': backfired}
+                 'eventid': checksum[-5:], 'backfired': backfired,
+                 'recurse': False}
         actions.append(entry)
 
 
@@ -879,7 +883,7 @@ while True:
             heartbeats['execute'].pop(pid, None)
             continue
         # If the process does not terminate, kill it
-        if timedout(['execute', pid], grace=5):
+        if timedout(['execute', pid], grace=10):
             try:
                 process.kill()
             except:
