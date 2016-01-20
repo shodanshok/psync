@@ -345,6 +345,8 @@ def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True):
     (process, output, error) = execute(cmd, action['source'], filelist,
                                        warn=warn, eventid=action['eventid'])
     if process.returncode == utils.RSYNC_TERMINATED:
+        log(utils.INFO, action['source'], "Rescheduling files: \n" + filelist,
+            eventid=action['eventid'])
         actions.append(action)
 
 
