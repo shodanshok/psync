@@ -799,7 +799,7 @@ def search_banned():
 
 def timedout(names, attempts=1, heart_field="last", timeout_field="timeout",
              grace=0):
-    # This is ugly, but it simply the following rows
+    # This is ugly, but it simplify the following rows
     heartbeat = heartbeats
     # Select correct heartbeat
     if type(names) is not list:
