@@ -799,12 +799,16 @@ def search_banned():
 
 def timedout(names, attempts=1, heart_field="last", timeout_field="timeout",
              grace=0):
+    # This is ugly, but it simply the following rows
     heartbeat = heartbeats
     # Select correct heartbeat
     if type(names) is not list:
         names = [names]
     for name in names:
-        heartbeat = heartbeat[name]
+        try:
+            heartbeat = heartbeat[name]
+        except:
+            return False
     # Load timeout
     timeout = heartbeat[timeout_field]
     if not timeout:
@@ -879,8 +883,12 @@ while True:
         # If pid is not numeric, something is wrong. Continue with next process
         if type(pid) is not int:
             continue
+        # If process does not exists anymore in the list, continue
+        try:
+            process = heartbeats['execute'][pid]['process']
+        except:
+            continue
         # If process was terminated/killed, remove it from list and continue
-        process = heartbeats['execute'][pid]['process']
         if process.poll():
             heartbeats['execute'].pop(pid, None)
             continue
