@@ -196,15 +196,17 @@ def parse_line(line):
         itemtype = "FILE"
     event = utils.deconcat(event, ",")[0]
     # Select sync method and skip unwanted events
-    if event == "CREATE" and itemtype == "DIR":
+    # On directories, CREATE is skipped to avoid backfire from rsync
+    # On files, CREATE is skipped because we want to sync only
+    # closed (ie: complete) files
+    if event == "CREATE":
         log(utils.DEBUG2, "Skipping uninteresting event for "+filename)
         return
     if event.find("SELF") >= 0:
         log(utils.DEBUG2, "Skipping uninteresting event for "+filename)
         return
     # Method selection
-    if (event == "ATTRIB" or event == "CREATE" or event == "CLOSE_WRITE" or
-            event == "MODIFY"):
+    if event == "ATTRIB" or event == "CLOSE_WRITE" or event == "MODIFY":
         method = "RSYNC"
     # MOVE handling
     elif event == "MOVED_FROM" or event == "MOVED_TO":
