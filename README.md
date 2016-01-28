@@ -26,8 +26,8 @@ Sending data is accomplished via [rsync](https://rsync.samba.org/), which need t
 
 Below you can find some event propagation examples. **L** and **R** means left and right, respectively.
 
-*CREATE and CLOSE_WRITE*  
-L: CREATE test.txt  
+*CLOSE_WRITE*  
+L: CREATE test.txt (this event will be skipped) 
 L: CLOSE_WRITE test.txt  
 *... wait some seconds ...*
 R: CREATE .test.txt.ABCDEF (temporary rsynch file; this event will be skipped)  
@@ -153,7 +153,7 @@ psync config files define various default parameters and give access to some int
 **`rsync_event_recurse=`** if set, rsync will use recursive scan by default (use only if you really know what are you doing)  
 **`alert_threshold=`** threshould over which the scheduled checks done via `rcheck.py` will signal an alarm  
 **`warning_threshold=`** threshould over which the scheduled checks done via `rcheck.py` will signal a warning  
-**`rsync_style=`** how to thread synchronization (ie: CREATE, CLOSE_WRITE) events. If set to 1, backfired sync events will be re-issued to the replication partner with "safe" rsync settings (ie: --existing). If set to 2, backfired sync event will be ignored for the duration of `pending_lifetime`. If set to 3, all rsync events will be batched for later execution [1, 2, 3]  
+**`rsync_style=`** how to treat synchronization (ie: CLOSE_WRITE) events. If set to 1, backfired sync events will be re-issued to the replication partner with "safe" rsync settings (ie: --existing). If set to 2, backfired sync event will be ignored for the duration of `pending_lifetime`. If set to 3, all rsync events will be batched for later execution [1, 2, 3]  
 **`acl_from_left_only=`** is set to True, ACLs will be set only from left to right. If set to False, ACLs can be set from right to left also (but be sure to read the ACCESS LIST paragraph first).  
 **`timeout=`** general timeout (in seconds), used as a base for other timeouts [number]  
 **`itimeout=`** initial cinotify timeout, in seconds [number]  
