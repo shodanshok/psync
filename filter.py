@@ -198,7 +198,14 @@ def parse_line(line):
     # Select sync method and skip unwanted events
     # On directories, CREATE is skipped to avoid backfire from rsync
     # On files, CREATE is skipped because we want to sync only
-    # closed (ie: complete) files
+    # closed/CLOSE_WRITE (ie: complete) files.
+    # To expand: when files are CREATED but not CLOSED, the mtime
+    # attribute can be 'wrong' (ie: newer) then what it should be
+    # Example: a file which need 60 seconds to be uploaded, will have
+    # a constantly-changing mtime until the upload complete, when the mtime
+    # will be rolled back to the original value.
+    # This behavior is application dependent, but we can't risk: a wrong
+    # mtime can led to wrong replication direction and truncated file.
     if event == "CREATE":
         log(utils.DEBUG2, "Skipping uninteresting event for "+filename)
         return
