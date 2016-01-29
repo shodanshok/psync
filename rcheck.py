@@ -33,6 +33,10 @@ def parse_options():
     return (options, args)
 
 def check(src, dst):
+    # Set initial values
+    changed = ""
+    resized = False
+    count = 0
     # Check via rsync
     excludelist = utils.gen_exclude(options.rsync_excludes)
     try:
@@ -53,11 +57,8 @@ def check(src, dst):
     if process.returncode != 0 and process.returncode != 23:
         print "ERROR while checking!"
         sys.stderr.write(error)
-        return (process.returncode, 0)
+        return (process.returncode, count, resized)
     # Count changed files
-    changed = ""
-    resized = False
-    count = 0
     for line in output.split("\n"):
         # If empty, continue
         if len(line) <= 0:
@@ -78,14 +79,14 @@ def check(src, dst):
     if len(changed):
         print "\nDifferences found while checking FROM "+src+" TO "+dst
         print changed.rstrip("\n")
-    return (0, count)
+    return (0, count, resized)
 
 # Run
 (options, args) = parse_options()
-(lcheck, lchanged) = check(options.srcroot,
-                           options.dsthost+":"+options.dstroot)
-(rcheck, rchanged) = check(options.dsthost+":"+options.dstroot,
-                           options.srcroot)
+(lcheck, lchanged, lresized) = check(options.srcroot,
+                                     options.dsthost+":"+options.dstroot)
+(rcheck, rchanged, rresized) = check(options.dsthost+":"+options.dstroot,
+                                     options.srcroot)
 
 # Error reporting is as follow (full/lite):
 # a) exit 0/0: no error, no differences
@@ -105,6 +106,11 @@ if lcheck == 0 and rcheck == 0:
 else:
     error = 1
 
+# If size changed, raise error level
+if lresized or rresized:
+    error = min(error, 3)
+
+# Lite checks have relaxed error codes
 if options.lite:
     if error == 1:
         error = 0
@@ -113,4 +119,5 @@ if options.lite:
     elif error == 4:
         error = 0
 
+# Exit with error code
 quit(error)
