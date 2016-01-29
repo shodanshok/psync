@@ -60,4 +60,4 @@ etimeout = timeout-15       # Execute timeout
 maxtimeout = timeout*15     # Max connection timeout (abort)
 
 # Schedules
-fullmerge = [10, 14, 20]
+fullmerge = [8, 14, 20]
