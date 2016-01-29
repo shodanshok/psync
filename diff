@@ -1,6 +1,6 @@
 #!/bin/bash
 dst=$1
-for file in `ls`; do
+for file in `find . | grep -v "\.git"`; do
     if [ "$file" == "diff" ]; then
         continue
     fi

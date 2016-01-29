@@ -51,6 +51,11 @@ def log(severity, message):
     thread = threading.current_thread()
     utils.log(severity, "U", message, options.debug, caller, thread)
 
+def delay_action(action):
+    actions.appendleft(action)
+    sleeptime = time.time() - action['timestamp']
+    time.sleep(options.interval - sleeptime)
+
 def dequeue():
     while True:
         try:
@@ -80,6 +85,13 @@ def dequeue():
                             "LV1 event: skipping non-modifying RSYNC event " +
                             "for file: "+action['file'])
                         continue
+                    # Is the file currently being written?
+                    if time.time() - os.stat(action['file']).st_ctime <= 1:
+                        log(utils.INFO,
+                            "LV1 event: delaying currently changing file " +
+                            action['file'])
+                        delay_action(action)
+                        continue
                 line = (action['method'] + config.separator +
                         action['itemtype'] + config.separator +
                         action['dir'] + config.separator +
@@ -89,9 +101,7 @@ def dequeue():
                 print line + config.separator + checksum + "\n",
                 sys.stdout.flush()
             else:
-                actions.appendleft(action)
-                time.sleep(options.interval -
-                           (time.time() - action['timestamp']))
+                delay_action(action)
         except:
             touch(heartfile)
             time.sleep(1)

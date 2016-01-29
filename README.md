@@ -30,8 +30,8 @@ Below you can find some event propagation examples. **L** and **R** means left a
 L: CREATE test.txt (this event will be skipped) 
 L: CLOSE_WRITE test.txt  
 *... wait some seconds ...*
-R: CREATE .test.txt.ABCDEF (temporary rsynch file; this event will be skipped)  
-R: CLOSE_WRITE .test.txt.ABCDEF (temporary rsynch file; this event will be skipped)  
+R: CREATE .test.txt.ABCDEF (temporary rsync file; this event will be skipped)  
+R: CLOSE_WRITE .test.txt.ABCDEF (temporary rsync file; this event will be skipped)  
 R: MOVE .test.txt.ABCDEF test.txt (as the source filename is excluded, this event will be skipped)  
 *Result:* the file is pushed to the remote partner without any backired event  
 

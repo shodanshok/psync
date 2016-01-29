@@ -20,10 +20,10 @@ from libs import config
 
 # Globally writable objects
 # Deque, dictionary and the likes
-actions = collections.deque()  # Actions - source,method,itemtype,files,dstfile
-locks = collections.deque()   # Locks
-dirs = {'L': {}, 'R': {}}        # Touched directories
-pendings = {'L': {}, 'R': {}}    # L,R
+actions = collections.deque()   # Actions - source,method,itemtype,files,dstfile
+locks = {'global':threading.Lock()} # Locks
+dirs = {'L': {}, 'R': {}}           # Touched directories
+pendings = {'L': {}, 'R': {}}       # L,R
 
 # Current state
 state = {
@@ -122,17 +122,20 @@ def parse_options():
     return (options, args)
 
 
-def is_locked(locktype=False):
-    # Do not run now if other operations are pendings
-    if len(locks) < 1:
-        return False
-    if not locktype:
-        return True
-    if locktype and (locktype in locks):
-        return True
-    else:
-        return False
-    return len(locks)
+def acquire(name):
+    locks[name].acquire()
+    caller = inspect.stack()[1][3]
+    log(utils.DEBUG2, "B", caller + " successfully acquired " + name + " lock")
+
+
+def release(name):
+    caller = inspect.stack()[1][3]
+    try:
+        locks[name].release()
+        log(utils.DEBUG2, "B", caller + " released " + name + " lock")
+    except:
+        log(utils.WARNING, "B", caller + " tried to release an unacquired " +
+            name + " lock")
 
 
 def check_delete(filelist, source):
@@ -161,7 +164,7 @@ def dequeue():
             time.sleep(1)
             continue
         # Raise lock
-        locks.append("dequeue")
+        acquire("global")
         # Print queue length
         log(utils.DEBUG1, "B", "Actions queue length: "+
             str(len(actions)+1), eventid=action['eventid'])
@@ -186,7 +189,7 @@ def dequeue():
                     action['method'] + config.separator + filename,
                     eventid=action['eventid'])
         # Release lock
-        locks.pop()
+        release("global")
 
 
 def get_mirror(source):
@@ -392,7 +395,6 @@ def full_syncher(oneshot=False):
             continue
         # If we really had to, proceed
         log(utils.INFO, "B", message)
-        locks.append("fullsync")
         ldirs = "/"
         rdirs = "/"
         # Relax file size limit
@@ -423,7 +425,6 @@ def full_syncher(oneshot=False):
         if process.returncode not in utils.RSYNC_SUCCESS:
             success = False
         log(utils.INFO, "B", "TIMED FULL SYNC: Ending")
-        locks.pop()
         # If oneshot, return now
         if oneshot:
             return success
@@ -438,11 +439,7 @@ def fast_syncher():
     while True:
         time.sleep(config.fast_sync_interval + 1 + random.random())
         log(utils.INFO, "B", "TIMED FAST SYNC: Waking up")
-        if is_locked("dequeue"):
-            log(utils.INFO, "B",
-                "Aborting timed FAST SYNC due to lock contention")
-            continue
-        locks.append("fastsync")
+        acquire("global")
         # Build directory list for fast check
         ldirs = ""
         rdirs = ""
@@ -463,7 +460,7 @@ def fast_syncher():
         # If nothing to do, release lock and return
         if not ldirs and not rdirs:
             log(utils.INFO, "B", "TIMED FAST SYNC: Nothing to do, ending")
-            locks.pop()
+            release("global")
             continue
         # Initialize two sets (left/right) of options
         rsync_loptions = []
@@ -522,7 +519,7 @@ def fast_syncher():
                 "the following dir list:\n" + dirlist)
             (process, output, error) = execute(cmd, "L", dirlist)
         log(utils.INFO, "B", "TIMED FAST SYNC: Ending")
-        locks.pop()
+        release("global")
 
 
 def connect_left():
@@ -872,22 +869,9 @@ fast_syncher = threading.Thread(name="syncher", target=fast_syncher)
 fast_syncher.daemon = True
 fast_syncher.start()
 
-# Main thread
-busylocks = 0
 while True:
     # Verify that no harmful process are running
     search_banned()
-    # Give a look at locks situation
-    if is_locked():
-        busylocks = busylocks + 1
-        if busylocks >= 360 or len(locks) > 5:
-            log(utils.WARNING, "B",
-                "LOCKS: The system is always busy with locks. " +
-                "Current locks: " + str(len(locks)) +
-                "\nMaybe a thread crashed/exited?")
-            log(utils.DEBUG2, "B", str(locks))
-    else:
-        busylocks = 0
     # Check for (and kill) slow processes
     for pid in heartbeats['execute'].keys():
         # If pid is not numeric, something is wrong. Continue with next process
