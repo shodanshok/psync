@@ -14,11 +14,11 @@ def parse_options():
 def scanlines():
     with open(options.logfile) as log:
         for line in log:
-            match = re.search('<f......... (.*)', line)
+            match = re.search('<f.[s+]....... (.*)', line)
             if match:
                 L[match.group(1)] = True
                 continue
-            match = re.search('>f......... (.*)', line)
+            match = re.search('>f.[s+]....... (.*)', line)
             if match:
                 R[match.group(1)] = True
                 continue
@@ -26,7 +26,7 @@ def scanlines():
 def compare():
     found = False
     for left_entry in L:
-       if left_entry in R:
+        if left_entry in R:
             print "Double-edited entry: "+left_entry
             found = True
     return found

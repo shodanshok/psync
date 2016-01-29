@@ -56,14 +56,25 @@ def check(src, dst):
         return (process.returncode, 0)
     # Count changed files
     changed = ""
+    resized = False
     count = 0
     for line in output.split("\n"):
-        if (len(line) > 0 and
-                (line[0] == "<" or line[0] == ">")):
-            if options.lite and line[2] != "+":
-                continue
-            changed = changed + " " + line + "\n"
-            count = count+1
+        # If empty, continue
+        if len(line) <= 0:
+            continue
+        # If not transfered, continue
+        if line[0] != "<" and line[0] != ">":
+            continue
+        # If size not changed, continue
+        if line[3] != "+" and line[3] != "s":
+            continue
+        # If size of an existing file changed, take note
+        if line[3] == "s":
+            resized = True
+        # Count changed lines
+        changed = changed + " " + line + "\n"
+        count = count+1
+    # If something changed, report it back
     if len(changed):
         print "\nDifferences found while checking FROM "+src+" TO "+dst
         print changed.rstrip("\n")

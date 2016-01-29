@@ -360,14 +360,15 @@ def full_syncher(oneshot=False):
             message = ("INITIAL SYNC\n" +
                        "Please wait: this can take a long time")
         else:
-            # If config.full_sync_interval is 0, disable full_syncher
-            if not config.full_sync_interval:
-                return
-            # Otherwise, sleep until full_sync_interval elapses
-            time.sleep(config.full_sync_interval)
             message = "TIMED FULL SYNC: Waking up"
+            # If config.full_sync_interval is 0, sleep for long
+            # Otherwise, sleep until full_sync_interval elapses
+            if not config.full_sync_interval:
+                time.sleep(900)
+            else:
+                time.sleep(config.full_sync_interval)
             # Is full_sync_merge selected?
-            if config.full_sync_merge:
+            if config.full_sync_merge and config.full_sync_interval:
                 merge = True
             else:
                 # If not, check if it's time of a schedules merge
@@ -378,11 +379,18 @@ def full_syncher(oneshot=False):
                         schedules['fullmerge']['merge'] = False
                 else:
                     schedules['fullmerge']['merge'] = True
+        # Add required options
         if merge:
             rsync_options = ["-AX"]
             message = message + "\n" + "Full merge selected"
         else:
             rsync_options = ["--existing"]
+        # If config.full_sync_interval is 0, continue for fullmerge only
+        if not config.full_sync_interval and not merge:
+            log(utils.DEBUG2, "B", "config.full_sync_interval is 0 " +
+                "and merge is False, skipping FULL SYNC")
+            continue
+        # If we really had to, proceed
         log(utils.INFO, "B", message)
         locks.append("fullsync")
         ldirs = "/"
@@ -424,6 +432,7 @@ def full_syncher(oneshot=False):
 def fast_syncher():
     # If config.fast_sync_interval is 0, disable fast_syncher
     if not config.fast_sync_interval:
+        log(utils.INFO, "B", "fast_sync_interval is 0, disabling FAST SYNC")
         return
     # else, go ahead
     while True:
@@ -431,7 +440,7 @@ def fast_syncher():
         log(utils.INFO, "B", "TIMED FAST SYNC: Waking up")
         if is_locked("dequeue"):
             log(utils.INFO, "B",
-                "Aborting timed fast sync due to lock contention")
+                "Aborting timed FAST SYNC due to lock contention")
             continue
         locks.append("fastsync")
         # Build directory list for fast check
@@ -462,6 +471,7 @@ def fast_syncher():
         # Relax file size limit
         rsync_loptions.append("--max-size=1024G")
         rsync_roptions.append("--max-size=1024G")
+        # Full merge?
         if not config.fast_sync_merge:
             rsync_loptions.append("--existing")
             rsync_roptions.append("--existing")

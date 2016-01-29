@@ -40,9 +40,9 @@ excludes = (".psync.ignore|.rsync-partial|/\..*\.......$|/____archive____/" +
 psyncdir = normalize_dir(".psync")
 heartfile = "heartbeat"
 separator = ":"
-fast_sync_interval = 60
+fast_sync_interval = 0 #0: disabled
 fast_sync_merge = False
-full_sync_interval = 900
+full_sync_interval = 0 #0: disabled
 full_sync_merge = False
 pending_lifetime = 60
 pending_events = ["RSYNC", "DELETE"]
@@ -60,4 +60,4 @@ etimeout = timeout-15       # Execute timeout
 maxtimeout = timeout*15     # Max connection timeout (abort)
 
 # Schedules
-fullmerge = [8, 14, 20]
+fullmerge = [10, 14, 20]
