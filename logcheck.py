@@ -1,5 +1,6 @@
 #!/usr/bin/python2
 import optparse
+import time
 import re
 
 L = {}
@@ -14,20 +15,28 @@ def parse_options():
 def scanlines():
     with open(options.logfile) as log:
         for line in log:
-            match = re.search('<f.[s+]....... (.*)', line)
+            match = re.search('\[(.*)\] \[.*\] \[.*\] \[.*\] \[.*\] ' +
+                              '<f.[s+]....... (.*)', line)
             if match:
-                L[match.group(1)] = True
+                timestamp = time.mktime(time.strptime(match.group(1),
+                                   "%Y-%m-%d %H:%M:%S"))
+                L[match.group(2)] = timestamp
                 continue
-            match = re.search('>f.[s+]....... (.*)', line)
+            match = re.search('\[(.*)\] \[.*\] \[.*\] \[.*\] \[.*\] >f.[s+]....... (.*)', line)
             if match:
-                R[match.group(1)] = True
+                timestamp = time.mktime(time.strptime(match.group(1),
+                                        "%Y-%m-%d %H:%M:%S"))
+                R[match.group(2)] = timestamp
                 continue
 
 def compare():
     found = False
     for left_entry in L:
         if left_entry in R:
-            print "Double-edited entry: "+left_entry
+            ltime = L[left_entry]
+            rtime = R[left_entry]
+            if abs(ltime-rtime) < 900:
+                print "Double-edited entry: "+left_entry
             found = True
     return found
 
