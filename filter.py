@@ -86,11 +86,11 @@ def dequeue():
                             "for file: "+action['file'])
                         continue
                     # Is the file currently being written?
-                    if time.time() - os.stat(action['file']).st_ctime <= 1:
+                    if (time.time() - os.stat(action['file']).st_ctime <=
+                            min(1, options.interval)):
                         log(utils.INFO,
                             "LV1 event: delaying currently changing file " +
                             action['file'])
-                        delay_action(action)
                         continue
                 line = (action['method'] + config.separator +
                         action['itemtype'] + config.separator +
@@ -270,15 +270,7 @@ def parse_line(line):
     except:
         prev = False
     if prev:
-        if method == prev['method'] and filename == prev['file']:
-            # If method is RSYNC, use the previous timestamp
-            # This will prevent to the delayed dequeue code
-            # to excessively delay RSYNC events
-            if method == "RSYNC":
-                entry['timestamp'] = prev['timestamp']
-            else:
-                pass
-        elif (method == "RSYNC" and prev['method'] == "DELETE" and
+        if (method == "RSYNC" and prev['method'] == "DELETE" and
               filename == prev['file']):
             pass
         else:
