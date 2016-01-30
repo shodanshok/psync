@@ -7,7 +7,6 @@ import optparse
 import inspect
 import hashlib
 import os.path
-import random
 import time
 import sys
 import os
@@ -31,7 +30,7 @@ state = {
 }
 
 schedules = {
-    'fullmerge': {'merge': False, 'hours': config.fullmerge}
+    'fullsync': {'hours': config.fullsync}
 }
 
 # Heartbeats
@@ -122,22 +121,6 @@ def parse_options():
     return (options, args)
 
 
-def acquire(name):
-    locks[name].acquire()
-    caller = inspect.stack()[1][3]
-    log(utils.DEBUG2, "B", caller + " successfully acquired " + name + " lock")
-
-
-def release(name):
-    caller = inspect.stack()[1][3]
-    try:
-        locks[name].release()
-        log(utils.DEBUG2, "B", caller + " released " + name + " lock")
-    except:
-        log(utils.WARNING, "B", caller + " tried to release an unacquired " +
-            name + " lock")
-
-
 def check_delete(filelist, source):
     filelist = utils.deconcat(filelist)
     if source == "L":
@@ -163,8 +146,6 @@ def dequeue():
         except:
             time.sleep(1)
             continue
-        # Raise lock
-        acquire("global")
         # Print queue length
         log(utils.DEBUG1, "B", "Actions queue length: "+
             str(len(actions)+1), eventid=action['eventid'])
@@ -188,8 +169,6 @@ def dequeue():
                     "Not connected, removing from queue event " +
                     action['method'] + config.separator + filename,
                     eventid=action['eventid'])
-        # Release lock
-        release("global")
 
 
 def get_mirror(source):
@@ -355,50 +334,25 @@ def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True):
 
 def full_syncher(oneshot=False):
     while True:
-        # By default, don't merge
-        merge = False
         # If oneshot, run full sync immediately
         if oneshot:
-            merge = True
-            message = ("INITIAL SYNC\n" +
-                       "Please wait: this can take a long time")
+            log(utils.INFO, "B", "INITIAL SYNC\n" +
+                "Please wait: this can take a long time")
         else:
-            message = "TIMED FULL SYNC: Waking up"
-            # If config.full_sync_interval is 0, sleep for long
-            # Otherwise, sleep until full_sync_interval elapses
-            if not config.full_sync_interval:
-                time.sleep(900)
-            else:
-                time.sleep(config.full_sync_interval)
-            # Is full_sync_merge selected?
-            if config.full_sync_merge and config.full_sync_interval:
-                merge = True
-            else:
-                # If not, check if it's time of a schedules merge
-                hour = int(time.strftime("%H"))
-                if hour in schedules['fullmerge']['hours']:
-                    if schedules['fullmerge']['merge']:
-                        merge = True
-                        schedules['fullmerge']['merge'] = False
-                else:
-                    schedules['fullmerge']['merge'] = True
+            time.sleep(3600)
+            log(utils.DEBUG2, "B", "TIMED FULL SYNC: Waking up")
+            # Check if it's time of a scheduled fullsync
+            hour = int(time.strftime("%H"))
+            if hour not in schedules['fullsync']['hours']:
+                log(utils.DEBUG2, "B", "TIMED FULL SYNC: not now. Sleeping...")
+                continue
+            log(utils.INFO, "B", "TIMED FULL SYNC: Starting")
         # Add required options
-        if merge:
-            rsync_options = ["-AX"]
-            message = message + "\n" + "Full merge selected"
-        else:
-            rsync_options = ["--existing"]
-        # If config.full_sync_interval is 0, continue for fullmerge only
-        if not config.full_sync_interval and not merge:
-            log(utils.DEBUG2, "B", "config.full_sync_interval is 0 " +
-                "and merge is False, skipping FULL SYNC")
-            continue
-        # If we really had to, proceed
-        log(utils.INFO, "B", message)
+        rsync_options = ["-AX"]
+        rsync_options.append("--max-size=1024G")
+        # Proceed
         ldirs = "/"
         rdirs = "/"
-        # Relax file size limit
-        rsync_options.append("--max-size=1024G")
         # First sync, from L to R
         success = True  # Be optimistic ;)
         excludelist = utils.gen_exclude(options.rsync_excludes)
@@ -411,7 +365,7 @@ def full_syncher(oneshot=False):
         if process.returncode not in utils.RSYNC_SUCCESS:
             success = False
         # Second sync, from R to L
-        if config.acl_from_left_only and merge:
+        if config.acl_from_left_only:
             try:
                 rsync_options.remove("-AX")
             except:
@@ -428,98 +382,6 @@ def full_syncher(oneshot=False):
         # If oneshot, return now
         if oneshot:
             return success
-
-
-def fast_syncher():
-    # If config.fast_sync_interval is 0, disable fast_syncher
-    if not config.fast_sync_interval:
-        log(utils.INFO, "B", "fast_sync_interval is 0, disabling FAST SYNC")
-        return
-    # else, go ahead
-    while True:
-        time.sleep(config.fast_sync_interval + 1 + random.random())
-        log(utils.INFO, "B", "TIMED FAST SYNC: Waking up")
-        acquire("global")
-        # Build directory list for fast check
-        ldirs = ""
-        rdirs = ""
-        # Left dirs
-        for dirname in dirs["L"].keys():
-            dirs["L"].pop(dirname, None)
-            ldirs = utils.concat(ldirs, utils.normalize_dir(
-                dirname.replace(options.srcroot, "")))
-        # Right dirs
-        for dirname in dirs["R"].keys():
-            dirs["R"].pop(dirname, None)
-            rdirs = utils.concat(rdirs, utils.normalize_dir(
-                dirname.replace(options.dstroot, "")))
-        # Prepare sync
-        ldirs = ldirs.rstrip("\n")
-        rdirs = rdirs.rstrip("\n")
-        excludelist = utils.gen_exclude(options.rsync_excludes)
-        # If nothing to do, release lock and return
-        if not ldirs and not rdirs:
-            log(utils.INFO, "B", "TIMED FAST SYNC: Nothing to do, ending")
-            release("global")
-            continue
-        # Initialize two sets (left/right) of options
-        rsync_loptions = []
-        rsync_roptions = []
-        # Relax file size limit
-        rsync_loptions.append("--max-size=1024G")
-        rsync_roptions.append("--max-size=1024G")
-        # Full merge?
-        if not config.fast_sync_merge:
-            rsync_loptions.append("--existing")
-            rsync_roptions.append("--existing")
-        # Left ALWAYS use acls...
-        rsync_loptions.append("-AX")
-        # ...but right only if configured
-        if not config.acl_from_left_only:
-            rsync_roptions.append("-AX")
-        # Synchronize. It will be done in four steps:
-        # a) L to R and reverse
-        # b) R to L and reverse
-        # It will update existing files only
-        if ldirs:
-            dirlist = ldirs
-            # First sync, from L to R
-            cmd = (["rsync", "-aiu"] + options.rsync_extra + rsync_loptions +
-                   ["-u", "--files-from=-"] +
-                   excludelist + [options.srcroot, options.dsthost + ":" +
-                                  options.dstroot])
-            log(utils.INFO, "B", "Timed fast sync from L to R started with" +
-                " the following dir list:\n" + dirlist)
-            (process, output, error) = execute(cmd, "L", dirlist)
-            # Second sync, from R to L
-            cmd = (["rsync", "-aiu"] + options.rsync_extra + rsync_roptions +
-                   ["-u", "--files-from=-", "--existing"] +
-                   excludelist + [options.dsthost + ":" + options.dstroot,
-                                  options.srcroot])
-            log(utils.INFO, "B", "Reverse fast sync from R to L started with" +
-                " the following dir list:\n" + dirlist)
-            (process, output, error) = execute(cmd, "R", dirlist)
-        if rdirs:
-            dirlist = rdirs
-            # First sync, from R to L
-            cmd = (["rsync", "-aiu"] + options.rsync_extra + rsync_roptions +
-                   ["-u", "--files-from=-"] +
-                   excludelist + [options.dsthost + ":" + options.dstroot,
-                                  options.srcroot])
-            log(utils.INFO, "B", "Timed fast sync from R to L started with " +
-                "the following dir list:\n" + dirlist)
-            (process, output, error) = execute(cmd, "R", dirlist)
-            # Second sync, from L to R
-            cmd = (["rsync", "-aiu"] + options.rsync_extra + rsync_loptions +
-                   ["-u", "--files-from=-", "--existing"] +
-                   excludelist + [options.srcroot, options.dsthost + ":" +
-                                  options.dstroot])
-            log(utils.INFO, "B",
-                "Reverse fast sync from L to R started with " +
-                "the following dir list:\n" + dirlist)
-            (process, output, error) = execute(cmd, "L", dirlist)
-        log(utils.INFO, "B", "TIMED FAST SYNC: Ending")
-        release("global")
 
 
 def connect_left():
@@ -864,10 +726,6 @@ replicator.start()
 full_syncher = threading.Thread(name="syncher", target=full_syncher)
 full_syncher.daemon = True
 full_syncher.start()
-# Timed FAST checker/synchronization
-fast_syncher = threading.Thread(name="syncher", target=fast_syncher)
-fast_syncher.daemon = True
-fast_syncher.start()
 
 while True:
     # Verify that no harmful process are running
