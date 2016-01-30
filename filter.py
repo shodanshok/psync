@@ -271,7 +271,7 @@ def parse_line(line):
         prev = False
     if prev:
         if (method == "RSYNC" and prev['method'] == "DELETE" and
-              filename == prev['file']):
+                filename == prev['file']):
             pass
         else:
             actions.append(prev)
