@@ -56,4 +56,4 @@ etimeout = timeout-15       # Execute timeout
 maxtimeout = timeout*15     # Max connection timeout (abort)
 
 # Schedules
-fullsync = [15, 16]
+fullsync = [01]

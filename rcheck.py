@@ -43,10 +43,10 @@ def check(src, dst):
         excludelist.remove("--exclude=*"+config.safesuffix)
     except:
         pass
-    rsync_args = ["-anui"]
-    if options.lite:
-        rsync_args.append("--max-size=90M")
-    cmd = (["rsync"] + rsync_args + options.extra + ["-n"] +
+    rsync_args = ["-anu", "--out-format=%i %n%L %l"]
+    if not options.lite:
+        rsync_args.append("--max-size=1024G")
+    cmd = (["rsync"] + options.extra + rsync_args + ["-n"] +
            excludelist + [src, dst])
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE)
