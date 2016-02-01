@@ -107,7 +107,7 @@ else:
     error = 1
 
 # If size changed, raise error level
-if lresized or rresized:
+if (lresized or rresized) and not options.lite:
     error = min(error, 3)
 
 # Lite checks have relaxed error codes

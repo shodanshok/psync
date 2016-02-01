@@ -5,11 +5,14 @@ source /root/scripts/psync/conf/config.sh
 source ../customer_info
 
 extra=""
-while getopts ":l" opt; do
+while getopts ":lt:" opt; do
     case $opt in
         l)
         extra+="-l"
         lite="true"
+        ;;
+        t)
+        RCPT+=" $OPTARG"
         ;;
         \?)
         ;;
@@ -22,15 +25,13 @@ logfile="$logdir/psync-$script.lastrun"
 mailcmd_notice="mail -r $FROM -s NOTICE:PSYNC:$CUSTOMER_NAME:$HOSTNAME $RCPT"
 mailcmd_alert="mail -r $FROM -s ALERT:PSYNC:$CUSTOMER_NAME:$HOSTNAME $RCPT"
 mailcmd_warning="mail -r $FROM -s WARNING:PSYNC:$CUSTOMER_NAME:$HOSTNAME $RCPT"
-options="$extra -r slave.assyoma.it /opt/fileserver /opt/fileserver"
+options="$extra -r slave.assyoma.it /opt/fileserver/test /opt/fileserver/test"
 
-# If a full check is running, exit
-if [ "$lite" == "true" ]; then
-    running=`ps ax | grep "psync/check" | grep -v grep`
-    running=`echo -n "$running" | wc -l`
-    if [ $running -gt 1 ]; then
-        exit
-    fi
+# If another check is running, exit
+running=`ps ax | grep "psync/check" | grep -v grep`
+running=`echo -n "$running" | wc -l`
+if [ $running -gt 1 ]; then
+    exit
 fi
 
 # Determine if we need to send and email
