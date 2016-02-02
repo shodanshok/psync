@@ -5,14 +5,17 @@ source /root/scripts/psync/conf/config.sh
 source ../customer_info
 
 extra=""
-while getopts ":lt:" opt; do
+while getopts ":lmt:" opt; do
     case $opt in
         l)
-        extra+="-l"
+        extra+=" -l "
         lite="true"
         ;;
         t)
-        RCPT+=" $OPTARG"
+        RCPT+=" $OPTARG "
+        ;;
+        m)
+        extra+=" -m "
         ;;
         \?)
         ;;
