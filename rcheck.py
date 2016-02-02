@@ -48,13 +48,20 @@ def check(src, dst):
     except:
         pass
     rsync_args = ["-anu", "--out-format=%i %n%L %l"]
-    if not (options.lite or options.modified_only):
+    # Set filesize limit
+    # For lite check, use the default from config.py
+    if options.lite:
+        pass
+    # For full of modified only checks, increase filesize limit
+    if options.modified_only or not options.lite:
         rsync_args.append("--max-size=1024G")
+    # Construct command and execute
     cmd = (["rsync"] + options.extra + rsync_args + ["-n"] +
            excludelist + [src, dst])
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE)
     (output, error) = process.communicate()
+    # Output and error reporting
     if options.debug:
         print cmd
         print output
@@ -124,7 +131,7 @@ else:
 
 # If alerted and this is a full check OR
 # modified_only is true, raise error level
-if (lalert or ralert):
+if lalert or ralert:
     if not options.lite or options.modified_only:
         error = min(error, 3)
 
