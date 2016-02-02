@@ -64,21 +64,30 @@ def check(src, dst):
         return (process.returncode, count, alert)
     # Count changed files
     for line in output.split("\n"):
-        # If empty, continue
+        # If empty, ignore
         if len(line) <= 0:
             continue
-        # If not transfered, continue
+        # If not transfered, ignore
         if line[0] != "<" and line[0] != ">":
             continue
-        # If checking for modified files only, ignore new files
-        if line[3] == "+" and options.modified_only:
-            continue
-        # If file exists but size or time not changed, continue
-        if line[3] != "+" and line[3] != "s" and line[4] != "t":
-            continue
-        # If size or time of an existing file changed, take note
-        if line[3] == "s" or line[4] == "t":
-            alert = True
+        # New or existing file?
+        if line[3] == "+":
+            if options.modified_only:
+                continue
+        else:
+            # For lite checks, raise an alert if size AND time
+            # of an existing file changed. Otherwise, ignore
+            if options.lite:
+                if line[3] == "s" and line[4] == "t":
+                    alert = True
+                else:
+                    continue
+            # For full checks, raise an alert if size OR time
+            # of an existing file changed. Otherwise, continue
+            else:
+                if line[3] == "s" or line[4] == "t":
+                    alert = True
+        # If we arrived here, the line is interesting.
         # Count changed lines
         changed = changed + " " + line + "\n"
         count = count+1
@@ -113,9 +122,11 @@ if lcheck == 0 and rcheck == 0:
 else:
     error = 1
 
-# If size changed, raise error level
-if (lalert or ralert) and not options.lite:
-    error = min(error, 3)
+# If alerted and this is a full check OR
+# modified_only is true, raise error level
+if (lalert or ralert):
+    if not options.lite or options.modified_only:
+        error = min(error, 3)
 
 # Lite checks have relaxed error codes
 if options.lite:
