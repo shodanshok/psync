@@ -50,10 +50,7 @@ def check(src, dst):
     rsync_args = ["-anu", "--out-format=%i %n%L %l"]
     # Set filesize limit
     # For lite check, use the default from config.py
-    if options.lite:
-        pass
-    # For full of modified only checks, increase filesize limit
-    if options.modified_only or not options.lite:
+    if not options.lite:
         rsync_args.append("--max-size=1024G")
     # Construct command and execute
     cmd = (["rsync"] + options.extra + rsync_args + ["-n"] +
@@ -82,10 +79,10 @@ def check(src, dst):
             if options.modified_only:
                 continue
         else:
-            # For lite checks, raise an alert if size AND time
-            # of an existing file changed. Otherwise, ignore
+            # For lite checks, raise an alert if size changed.
+            # If not, ignore
             if options.lite:
-                if line[3] == "s" and line[4] == "t":
+                if line[3] == "s":
                     alert = True
                 else:
                     continue
