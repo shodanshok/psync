@@ -9,6 +9,10 @@ import os
 # Custom imports
 sys.dont_write_bytecode = True
 
+# Defines
+FAKESUM = "00000000000000000000000000000000"
+CSUMLEN = len(FAKESUM)
+
 def parse_options():
     parser = optparse.OptionParser()
     parser.add_option("-b", "--basedir", dest="basedir",
@@ -20,17 +24,22 @@ def parse_options():
     parser.add_option("-n", "--newer", dest="newer",
                       help="Only check files changed since last N minutes",
                       action="store", default=None)
+    parser.add_option("-k", "--fake-checksum", dest="fakechecksum",
+                      help="Do not really compute checksum",
+                      action="store_true", default=False)
     (options, args) = parser.parse_args()
+    # Normalize basedir
+    options.basedir = options.basedir.rstrip("/")+"/"
     return (options, args)
 
 def summarize(args):
     # Iterate between files
     for arg in args:
         # Prepend basedir
-        arg = options.basedir+arg
+        arg = options.basedir+(arg.lstrip("/"))
         # Default values
         mtime = 0
-        digest = "00000000000000000000000000000000"
+        digest = FAKESUM
         csum = hashlib.md5()
         # Prepare reftime
         if options.newer:
@@ -39,18 +48,24 @@ def summarize(args):
             reftime = 0
         # Read file
         try:
-            mtime = os.stat(arg).st_mtime
+            stat = os.stat(arg)
+            mtime = stat.st_mtime
             # Compare mtime with reftime. If newer, proceed
             if mtime >= reftime:
+                # If fakechecksum, cheat
+                if options.fakechecksum:
+                    size = stat.st_size
+                    digest = str(size).zfill(32)
+                else:
                 # Read and compute checksum
-                with open(arg, "rb") as f:
-                    while True:
-                        buf = f.read(options.chunksize)
-                        if len(buf):
-                            csum.update(buf)
-                        else:
-                            break
-                digest = csum.hexdigest()
+                    with open(arg, "rb") as f:
+                        while True:
+                            buf = f.read(options.chunksize)
+                            if len(buf):
+                                csum.update(buf)
+                            else:
+                                break
+                    digest = csum.hexdigest()
         except:
             pass
         # Print data

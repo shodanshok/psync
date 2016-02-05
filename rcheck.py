@@ -9,6 +9,11 @@ sys.dont_write_bytecode = True
 from libs import utils
 from libs import config
 
+# Defines
+FAKESUM = "00000000000000000000000000000000"
+CSUMLEN = len(FAKESUM)
+FLAGLEN = 12
+
 def parse_options():
     parser = optparse.OptionParser()
     parser.add_option("-r", "--remote-host", dest="dsthost",
@@ -26,6 +31,9 @@ def parse_options():
     parser.add_option("-c", "--checksum", dest="checksum",
                       help="Compute checksum for changed files",
                       action="store_true", default=False)
+    parser.add_option("-k", "--fake-checksum", dest="fakechecksum",
+                      help="Do not really compute checksum",
+                      action="store_true", default=False)
     parser.add_option("-n", "--newer", dest="newer",
                       help="Consider only files changed since N minutes",
                       action="store", default=None)
@@ -34,6 +42,9 @@ def parse_options():
     parser.add_option("--dstroot", dest="dstroot", action="store",
                       default=None)
     (options, args) = parser.parse_args()
+    # Fake checksum implies checksum
+    if options.fakechecksum:
+        options.checksum = True
     # Checksum automatically disables lite check
     if options.checksum:
         options.lite = False
@@ -78,6 +89,8 @@ def checksum(source, basedir, changed):
     if options.newer:
         cmd.append("-n")
         cmd.append(options.newer)
+    if options.fakechecksum:
+        cmd.append("-k")
     # Execute
     (process, output, error) = execute(cmd, changedfiles)
     if process.returncode or len(output) <= 0:
@@ -85,8 +98,8 @@ def checksum(source, basedir, changed):
     # Parse output
     for line in output.split("\n"):
         if len(line):
-            csum = line[:32]
-            name = line[33:]
+            csum = line[:CSUMLEN]
+            name = line[CSUMLEN+1:]
             clist[name] = csum
     # Return
     return (process.returncode, clist)
@@ -139,7 +152,7 @@ def check(src, dst):
         # Count changed lines
         count = count+1
         if options.checksum:
-            changed.append(line[12:])
+            changed.append(line[FLAGLEN:])
         else:
             changed = utils.concat(changed, line)
     # Return
@@ -161,8 +174,7 @@ def showcdiff(llist, rlist):
         if lsum == rsum:
             continue
         # If sum is zero, continue
-        if (lsum == "00000000000000000000000000000000" or
-                rsum == "00000000000000000000000000000000"):
+        if lsum == FAKESUM or rsum == FAKESUM:
             continue
         # If sums differ
         changed = utils.concat(changed, entry)

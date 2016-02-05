@@ -5,7 +5,7 @@ source /root/scripts/psync/conf/config.sh
 source ../customer_info
 
 extra=""
-while getopts ":cln:t:" opt; do
+while getopts ":ckln:t:" opt; do
     case $opt in
         l)
         extra+=" -l "
@@ -19,6 +19,9 @@ while getopts ":cln:t:" opt; do
         ;;
         n)
         extra+=" -n $OPTARG"
+        ;;
+        k)
+        extra+=" -k "
         ;;
         \?)
         ;;
