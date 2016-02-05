@@ -128,6 +128,9 @@ def check(src, dst):
         # If checksum, ignore new files
         if options.checksum and line[3] == "+":
             continue
+        # Lite checks ignore existing files with same size
+        if options.lite and line[3] != "s" and line[3] != "+":
+            continue
         # For full checks, raise an alert if size OR time
         # of an existing file changed. Otherwise, continue
         if not options.lite and (line[3] == "s" or line[4] == "t"):
