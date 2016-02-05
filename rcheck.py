@@ -37,6 +37,9 @@ def parse_options():
     parser.add_option("-n", "--newer", dest="newer",
                       help="Consider only files changed since N minutes",
                       action="store", default=None)
+    parser.add_option("-m", "--modified_only", dest="modified_only",
+                      help="Consider only modified files, ignoring new files",
+                      action="store_true", default=False)
     parser.add_option("--srcroot", dest="srcroot", action="store",
                       default=None)
     parser.add_option("--dstroot", dest="dstroot", action="store",
@@ -45,8 +48,8 @@ def parse_options():
     # Fake checksum implies checksum
     if options.fakechecksum:
         options.checksum = True
-    # Checksum automatically disables lite check
-    if options.checksum:
+    # Checksum or modified_only automatically disables lite check
+    if options.checksum or options.modified_only:
         options.lite = False
     # srcroot and dstroot
     options.srcroot = utils.normalize_dir(args[0])
@@ -120,9 +123,15 @@ def check(src, dst):
         pass
     rsync_args = ["-anui"]
     # Set filesize limit
-    # For lite check, use the default from config.py
-    # For full check os when using cheksum, increse size limit
-    if not options.lite:
+    # For lite or modified_only checks, use the default from config.py
+    # For full check or when using cheksum, increse size limit
+    if options.checksum:
+        rsync_args.append("--max-size=1024G")
+    elif options.modified_only:
+        pass
+    elif options.lite:
+        pass
+    else:
         rsync_args.append("--max-size=1024G")
     # Construct command and execute
     cmd = (["rsync"] + options.extra + rsync_args + ["-n"] +
@@ -138,15 +147,23 @@ def check(src, dst):
         # If not transfered, ignore
         if line[0] != "<" and line[0] != ">":
             continue
-        # If checksum, ignore new files
+        # If checksum or modified_only, ignore new files
         if options.checksum and line[3] == "+":
             continue
-        # Lite checks ignore existing files with same size
-        if options.lite and line[3] != "s" and line[3] != "+":
+        # Modified_only checks focus on existing files with different size
+        elif options.modified_only and line[3] != "s":
             continue
+        # Lite checks ignore existing files with same size
+        elif options.lite and line[3] != "s" and line[3] != "+":
+            continue
+        # Alerts
+        # For modified_only checks, raise an alert if size
+        # of an existing file changed. Otherwise, continue
+        if options.modified_only and line[3] == "s":
+            alert = True
         # For full checks, raise an alert if size OR time
         # of an existing file changed. Otherwise, continue
-        if not options.lite and (line[3] == "s" or line[4] == "t"):
+        elif not options.lite and (line[3] == "s" or line[4] == "t"):
             alert = True
         # If we arrived here, the line is interesting.
         # Count changed lines

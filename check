@@ -5,7 +5,7 @@ source /root/scripts/psync/conf/config.sh
 source ../customer_info
 
 extra=""
-while getopts ":ckln:t:" opt; do
+while getopts ":cklmn:t:" opt; do
     case $opt in
         l)
         extra+=" -l "
@@ -23,6 +23,9 @@ while getopts ":ckln:t:" opt; do
         k)
         extra+=" -k "
         ;;
+        m)
+        extra+=" -m "
+        ;;
         \?)
         ;;
     esac
@@ -32,7 +35,7 @@ send_mail=1
 lastcode=1
 logfile="$logdir/psync-$script.lastrun"
 mailcmd_notice="mail -r $FROM -s NOTICE:PSYNC:$CUSTOMER_NAME:$HOSTNAME $RCPT"
-mailcmd_alert="mail -r $FROM -s ALERT:PSYNC:$CUSTOMER_NAME:$HOSTNAME $RCPT"
+mailcmd_alert="mail -r $FROM -s ***ALERT:PSYNC:$CUSTOMER_NAME:$HOSTNAME*** $RCPT"
 options="$extra -r slave.assyoma.it /opt/fileserver/test /opt/fileserver/test"
 
 # If another check is running, exit
