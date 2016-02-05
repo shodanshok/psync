@@ -5,7 +5,7 @@ source /root/scripts/psync/conf/config.sh
 source ../customer_info
 
 extra=""
-while getopts ":cklmn:t:" opt; do
+while getopts ":cklmn:t:X" opt; do
     case $opt in
         l)
         extra+=" -l "
@@ -26,7 +26,11 @@ while getopts ":cklmn:t:" opt; do
         m)
         extra+=" -m "
         ;;
+        X)
+        extra+=" -X "
+        ;;
         \?)
+        echo "Unknow option"
         ;;
     esac
 done

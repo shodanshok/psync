@@ -40,6 +40,9 @@ def parse_options():
     parser.add_option("-m", "--modified_only", dest="modified_only",
                       help="Consider only modified files, ignoring new files",
                       action="store_true", default=False)
+    parser.add_option("-X", "--nolinks", dest="nolinks",
+                      help="Exclude links from comparison",
+                      action="store_true", default=False)
     parser.add_option("--srcroot", dest="srcroot", action="store",
                       default=None)
     parser.add_option("--dstroot", dest="dstroot", action="store",
@@ -133,6 +136,13 @@ def check(src, dst):
         pass
     else:
         rsync_args.append("--max-size=1024G")
+    # Link disabling
+    if options.nolinks:
+        try:
+            options.extra.remove("-L")
+        except:
+            pass
+        rsync_args.append("--no-l")
     # Construct command and execute
     cmd = (["rsync"] + options.extra + rsync_args + ["-n"] +
            excludelist + [src, dst])
