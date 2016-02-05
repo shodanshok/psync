@@ -12,6 +12,7 @@ basedir = normalize_dir(os.path.dirname(os.path.dirname(__file__)))
 helperbin = basedir+"libs/helpers.py"
 filterbin = basedir+"filter.py"
 inotifybin = basedir+"cinotify/cinotify"
+csumbin = basedir+"libs/csum.py"
 
 # START OF USER EDITABLE CONFIGURATION
 # Safename suffix
@@ -45,7 +46,6 @@ pending_events = ["RSYNC", "DELETE"]
 ssh_options = ["-o", "ConnectTimeout=10", "-C"]
 rsync_event_recurse = False
 alert_threshold = 10
-warning_threshold = 20
 rsync_style = 2 # 1: continuous, 2: continuous w/o backfired, 3: batchched
 acl_from_left_only = True
 

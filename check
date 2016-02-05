@@ -5,7 +5,7 @@ source /root/scripts/psync/conf/config.sh
 source ../customer_info
 
 extra=""
-while getopts ":lmt:" opt; do
+while getopts ":clnt:" opt; do
     case $opt in
         l)
         extra+=" -l "
@@ -14,8 +14,11 @@ while getopts ":lmt:" opt; do
         t)
         RCPT+=" $OPTARG "
         ;;
-        m)
-        extra+=" -m "
+        c)
+        extra+=" -c "
+        ;;
+        n)
+        extra+=" -n $OPTARG"
         ;;
         \?)
         ;;
@@ -27,7 +30,6 @@ lastcode=1
 logfile="$logdir/psync-$script.lastrun"
 mailcmd_notice="mail -r $FROM -s NOTICE:PSYNC:$CUSTOMER_NAME:$HOSTNAME $RCPT"
 mailcmd_alert="mail -r $FROM -s ALERT:PSYNC:$CUSTOMER_NAME:$HOSTNAME $RCPT"
-mailcmd_warning="mail -r $FROM -s WARNING:PSYNC:$CUSTOMER_NAME:$HOSTNAME $RCPT"
 options="$extra -r slave.assyoma.it /opt/fileserver/test /opt/fileserver/test"
 
 # If another check is running, exit
@@ -56,10 +58,8 @@ echo "EXIT CODE: $error" >> $logfile
 # Error reporting
 if [ $error -gt 0 ] && [ $lastcode -gt 0 ]; then
     if [ $error -eq 1 ] || [ $error -eq 2 ]; then
-        mailcmd=$mailcmd_warning
-    elif [ $error -eq 3 ]; then
         mailcmd=$mailcmd_alert
-    elif [ $error -eq 4 ]; then
+    elif [ $error -eq 3 ]; then
         mailcmd=$mailcmd_notice
     fi
     mailobj="Scheduled comparision detected some unexpected differences\nPlease check them manually"

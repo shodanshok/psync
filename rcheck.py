@@ -23,49 +23,100 @@ def parse_options():
                       action="store", default=config.debug)
     parser.add_option("-l", "--lite", dest="lite", help="Relaxed checks",
                       action="store_true", default=False)
-    parser.add_option("-m", "--modified-only", dest="modified_only",
-                      help="Check for modified files, ignoring new files",
+    parser.add_option("-c", "--checksum", dest="checksum",
+                      help="Compute checksum for changed files",
                       action="store_true", default=False)
+    parser.add_option("-n", "--newer", dest="newer",
+                      help="Consider only files changed since N minutes",
+                      action="store", default=None)
     parser.add_option("--srcroot", dest="srcroot", action="store",
                       default=None)
     parser.add_option("--dstroot", dest="dstroot", action="store",
                       default=None)
     (options, args) = parser.parse_args()
+    # Checksum automatically disables lite check
+    if options.checksum:
+        options.lite = False
     # srcroot and dstroot
     options.srcroot = utils.normalize_dir(args[0])
     options.dstroot = utils.normalize_dir(args[1])
     return (options, args)
 
+def execute(cmd, stdin=None):
+    # Execute
+    process = subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+    (output, error) = process.communicate(stdin)
+    # Output reporting
+    if options.debug:
+        print cmd
+        if output:
+            print output
+    # Ignore specific rsync errors
+    if process.returncode in utils.RSYNC_SUCCESS:
+        process.returncode = 0
+    # Error reporting
+    if process.returncode:
+        print "ERROR executing command "+str(cmd)
+        if error:
+            sys.stderr.write(error)
+    return (process, output, error)
+
+def checksum(source, basedir, changed):
+    # Set initial values
+    clist = {}
+    changedfiles = "\n".join(set(changed))
+    # Command selection
+    if source == "L":
+        cmd = ["xargs", "-d", "\n", config.csumbin, "-b", basedir]
+    else:
+        cmd = (["ssh"] + config.ssh_options +
+               [options.dsthost, "xargs", "-d", "'\n'", config.csumbin,
+                "-b", basedir])
+    # Append other options
+    if options.newer:
+        cmd.append("-n")
+        cmd.append(options.newer)
+    # Execute
+    (process, output, error) = execute(cmd, changedfiles)
+    if process.returncode or len(output) <= 0:
+        return (process.returncode, clist)
+    # Parse output
+    for line in output.split("\n"):
+        if len(line):
+            csum = line[:32]
+            name = line[33:]
+            clist[name] = csum
+    # Return
+    return (process.returncode, clist)
+
 def check(src, dst):
     # Set initial values
-    changed = ""
     alert = False
     count = 0
+    if options.checksum:
+        changed = []
+    else:
+        changed = ""
     # Check via rsync
     excludelist = utils.gen_exclude(options.rsync_excludes)
     try:
         excludelist.remove("--exclude=*"+config.safesuffix)
     except:
         pass
-    rsync_args = ["-anu", "--out-format=%i %n%L %l"]
+    rsync_args = ["-anui"]
     # Set filesize limit
     # For lite check, use the default from config.py
+    # For full check os when using cheksum, increse size limit
     if not options.lite:
         rsync_args.append("--max-size=1024G")
     # Construct command and execute
     cmd = (["rsync"] + options.extra + rsync_args + ["-n"] +
            excludelist + [src, dst])
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE)
-    (output, error) = process.communicate()
-    # Output and error reporting
-    if options.debug:
-        print cmd
-        print output
-    if process.returncode != 0 and process.returncode != 23:
-        print "ERROR while checking!"
-        sys.stderr.write(error)
-        return (process.returncode, count, alert)
+    (process, output, error) = execute(cmd)
+    if process.returncode:
+        return (process.returncode, count, changed, alert)
     # Count changed files
     for line in output.split("\n"):
         # If empty, ignore
@@ -74,71 +125,108 @@ def check(src, dst):
         # If not transfered, ignore
         if line[0] != "<" and line[0] != ">":
             continue
-        # New or existing file?
-        if line[3] == "+":
-            if options.modified_only:
-                continue
-        else:
-            # For lite checks, raise an alert if size changed.
-            # If not, ignore
-            if options.lite:
-                if line[3] == "s":
-                    alert = True
-                else:
-                    continue
-            # For full checks, raise an alert if size OR time
-            # of an existing file changed. Otherwise, continue
-            else:
-                if line[3] == "s" or line[4] == "t":
-                    alert = True
+        # If checksum, ignore new files
+        if options.checksum and line[3] == "+":
+            continue
+        # For full checks, raise an alert if size OR time
+        # of an existing file changed. Otherwise, continue
+        if not options.lite and (line[3] == "s" or line[4] == "t"):
+            alert = True
         # If we arrived here, the line is interesting.
         # Count changed lines
-        changed = changed + " " + line + "\n"
         count = count+1
-    # If something changed, report it back
+        if options.checksum:
+            changed.append(line[12:])
+        else:
+            changed = utils.concat(changed, line)
+    # Return
+    return (process.returncode, count, changed, alert)
+
+def showrdiff(src, dst, changed):
     if len(changed):
         print "\nDifferences found while checking FROM "+src+" TO "+dst
         print changed.rstrip("\n")
-    return (0, count, alert)
 
-# Run
+def showcdiff(llist, rlist):
+    # Initial values
+    changed = ""
+    alert = False
+    for entry in llist:
+        lsum = llist[entry]
+        rsum = rlist[entry]
+        # If sum is equal, continue
+        if lsum == rsum:
+            continue
+        # If sum is zero, continue
+        if (lsum == "00000000000000000000000000000000" or
+                rsum == "00000000000000000000000000000000"):
+            continue
+        # If sums differ
+        changed = utils.concat(changed, entry)
+        alert = True
+    # If found, print the differing files
+    if len(changed):
+        print "\nDifferences found"
+        print changed.rstrip("\n")
+    return (alert, alert)
+
+
+# Initial values and options parsing
+error = 0
 (options, args) = parse_options()
-(lcheck, lchanged, lalert) = check(options.srcroot,
-                                   options.dsthost+":"+options.dstroot)
-(rcheck, rchanged, ralert) = check(options.dsthost+":"+options.dstroot,
-                                   options.srcroot)
+# Find changed files with rsync
+(lcheck, lcount, lchanged, lalert) = check(options.srcroot,
+                                           options.dsthost+":"+options.dstroot)
+(rcheck, rcount, rchanged, ralert) = check(options.dsthost+":"+options.dstroot,
+                                           options.srcroot)
+# If rsync died with an error, quit
+if lcheck or rcheck:
+    error = 1
+    quit(error)
 
-# Error reporting is as follow (full/lite):
-# a) exit 0/0: no error, no differences
-# b) exit 1/0: any error
-# c) exit 2/3: no error, many differences
-# d) exit 3/3: no error, some differences
-# e) exit 4/0: no error, very few differences
-if lcheck == 0 and rcheck == 0:
-    if (lchanged+rchanged) >= config.warning_threshold:
+# If checksum is needed, calculate it. Otherwise, print rsync output
+if options.checksum:
+    bchanged = lchanged + rchanged
+    (lchecksum, llist) = checksum("L", options.srcroot, bchanged)
+    (rchecksum, rlist) = checksum("R", options.dstroot, bchanged)
+    if lchecksum or rchecksum:
+        error = 1
+    else:
+        (lalert, ralert) = showcdiff(llist, rlist)
+else:
+    showrdiff(options.srcroot, options.dsthost+":"+options.dstroot, lchanged)
+    showrdiff(options.dsthost+":"+options.dstroot, options.srcroot, rchanged)
+# If checksum died with an error, quit
+if error:
+    quit(error)
+
+# Error reporting
+# 0: no differences at all
+# 1: process error
+# 2: alert
+# 3: notice
+if options.checksum:
+    if lalert or ralert:
         error = 2
-    elif (lchanged+rchanged) >= config.alert_threshold:
-        error = 3
-    elif (lchanged+rchanged) > 0:
-        error = 4
     else:
         error = 0
 else:
-    error = 1
-
-# If alerted and this is a full check OR
-# modified_only is true, raise error level
-if lalert or ralert:
-    if not options.lite or options.modified_only:
-        error = min(error, 3)
+    if lalert or ralert:
+        error = 2
+    elif (lcount+rcount) >= config.alert_threshold:
+        error = 2
+    elif (lcount+rcount) > 0:
+        error = 3
+    else:
+        error = 0
 
 # Lite checks have relaxed error codes
+# 1 (process error) become 0
+# 3 (notice) become 0
 if options.lite:
     if error == 1:
         error = 0
-    elif error == 2:
-        error = 3
-    elif error == 4:
+    elif error == 3:
         error = 0
 
 # Exit with error code
