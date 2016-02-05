@@ -5,7 +5,7 @@ source /root/scripts/psync/conf/config.sh
 source ../customer_info
 
 extra=""
-while getopts ":clnt:" opt; do
+while getopts ":cln:t:" opt; do
     case $opt in
         l)
         extra+=" -l "

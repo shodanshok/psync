@@ -1,4 +1,4 @@
 @reboot                 root /root/scripts/psync/start
 */5 7-22        * * *   root /root/scripts/psync/runcheck
 */15 8-12,14-20 * * *   root /root/scripts/psync/check -l
-01 0            * * *   root /root/scripts/psync/check
+01 0            * * *   root /root/scripts/psync/check -c -n 1080
