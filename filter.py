@@ -71,12 +71,21 @@ def dequeue():
                             "LV1 event: change from DELETE to RSYNC " +
                             "for file: " + action['file'])
                         action['method'] = "RSYNC"
-                # Is the to-be-synched file a valid one?
+                # Before-sync checks
                 if action['method'] == "RSYNC":
-                    if not os.path.exists(action['file']):
+                    # Is the to-be-synched file a valid one?
+                    try:
+                        stat = os.stat(action['file'])
+                    except:
                         log(utils.DEBUG2,
                             "LV1 event: skipping stale RSYNC event " +
                             "for file: "+action['file'])
+                        continue
+                    # If file is zero-sized, ignore it
+                    if not stat.st_size and action['file'] != heartfile:
+                        log(utils.DEBUG2,
+                            "LV1 event: skipping RSYNC event " +
+                            "for zero-sized file: " + action['file'])
                         continue
                     # Was the file really modified?
                     if (time.time() - os.stat(action['file']).st_ctime >
