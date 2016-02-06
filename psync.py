@@ -327,8 +327,8 @@ def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True):
     # Execute and report
     log(utils.DEBUG2, action['source'], "Preparing to sync: \n" + filelist,
         eventid=action['eventid'])
-    cmd = (["rsync", "-aiu"] + options.rsync_extra + rsync_options +
-           ["-u", "--files-from=-"] + excludelist + [left, right])
+    cmd = (["rsync", "-ai"] + options.rsync_extra + rsync_options +
+           ["--files-from=-"] + excludelist + [left, right])
     (process, output, error) = execute(cmd, action['source'], filelist,
                                        warn=warn, eventid=action['eventid'])
     if process.returncode == utils.RSYNC_TERMINATED:
