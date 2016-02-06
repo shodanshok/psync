@@ -316,8 +316,13 @@ def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True):
         left = options.dsthost + ":" + options.dstroot
         right = options.srcroot
         filelist = action['filelist'].replace(right, "")
+    # Filelist mangling to remove duplicate
     if len(filelist) == 0:
         filelist = "/"
+    else:
+        fileset = set(utils.deconcat(filelist))
+        filelist = "\n".join(fileset)
+    # Generating exclude list
     excludelist = utils.gen_exclude(options.rsync_excludes)
     # Execute and report
     log(utils.DEBUG2, action['source'], "Preparing to sync: \n" + filelist,
@@ -592,19 +597,6 @@ def reader(process, source="B"):
                 log(utils.DEBUG1, source, "Ignoring backfired event "+method+
                     config.separator + srcfile)
             continue
-        # Registering directory for further analysis
-        if not backfired:
-            if itemtype == "DIR":
-                if method == "RSYNC":
-                    register_dir(source, srcfile)
-                elif method == "MOVE":
-                    unregister_dir(source, srcfile)
-                    register_dir(source, dstfile)
-                elif method == "DELETE":
-                    unregister_dir(source, srcfile)
-            else:
-                if method == "RSYNC" or method == "MOVE":
-                    register_dir(source, parent)
         # If batched rsync is true, continue to the next event
         if config.rsync_style == 3:
             continue
