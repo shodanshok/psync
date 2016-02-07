@@ -56,6 +56,35 @@ def delay_action(action):
     sleeptime = time.time() - action['timestamp']
     time.sleep(options.interval - sleeptime)
 
+def rsync_checks(action):
+    if action['method'] != "RSYNC":
+        return True
+    # Is the to-be-synched file a valid one?
+    try:
+        stat = os.stat(action['file'])
+    except:
+        log(utils.DEBUG2,
+            "LV1 event: skipping stale RSYNC event " +
+            "for file: "+action['file'])
+        return False
+    # If heartfile, relax checks
+    if action['file'] == heartfile:
+        return True
+    # If file is zero-sized, ignore it
+    if not stat.st_size:
+        log(utils.DEBUG2,
+            "LV1 event: skipping RSYNC event " +
+            "for zero-sized file: " + action['file'])
+        return False
+    # Was the file really modified?
+    if time.time() - os.stat(action['file']).st_ctime > 60:
+        log(utils.DEBUG2,
+            "LV1 event: skipping non-modifying RSYNC event " +
+            "for file: "+action['file'])
+        return False
+    # If all it's ok, return True
+    return True
+
 def dequeue():
     while True:
         try:
@@ -73,26 +102,7 @@ def dequeue():
                         action['method'] = "RSYNC"
                 # Before-sync checks
                 if action['method'] == "RSYNC":
-                    # Is the to-be-synched file a valid one?
-                    try:
-                        stat = os.stat(action['file'])
-                    except:
-                        log(utils.DEBUG2,
-                            "LV1 event: skipping stale RSYNC event " +
-                            "for file: "+action['file'])
-                        continue
-                    # If file is zero-sized, ignore it
-                    if not stat.st_size and action['file'] != heartfile:
-                        log(utils.DEBUG2,
-                            "LV1 event: skipping RSYNC event " +
-                            "for zero-sized file: " + action['file'])
-                        continue
-                    # Was the file really modified?
-                    if (time.time() - os.stat(action['file']).st_ctime >
-                            max((options.interval*2)+1, 60)):
-                        log(utils.DEBUG2,
-                            "LV1 event: skipping non-modifying RSYNC event " +
-                            "for file: "+action['file'])
+                    if not rsync_checks(action):
                         continue
                     # Is the file currently being written?
                     if (time.time() - os.stat(action['file']).st_ctime <=
@@ -101,6 +111,7 @@ def dequeue():
                             "LV1 event: delaying currently changing file " +
                             action['file'])
                         continue
+                # Construct and print line
                 line = (action['method'] + config.separator +
                         action['itemtype'] + config.separator +
                         action['dir'] + config.separator +
@@ -270,9 +281,13 @@ def parse_line(line):
     if translated and not method == "RSYNC":
         log(utils.DEBUG2, "Skipping non-rsync method for translated line")
         return
-    # Coalesce and append actions
+    # Construct action
     entry = {'method':method, 'itemtype':itemtype, 'dir':dirname,
              'file':filename, 'dstfile':dstfile, 'timestamp':time.time()}
+    # Rsync checks
+    if method == "RSYNC":
+        if not rsync_checks(entry):
+            return
     # Coalesce and append actions
     try:
         prev = actions.pop()
