@@ -56,7 +56,7 @@ def delay_action(action):
     sleeptime = time.time() - action['timestamp']
     time.sleep(options.interval - sleeptime)
 
-def rsync_checks(action):
+def rsync_checks(action, ctime=60):
     if action['method'] != "RSYNC":
         return True
     # Is the to-be-synched file a valid one?
@@ -77,7 +77,7 @@ def rsync_checks(action):
             "for zero-sized file: " + action['file'])
         return False
     # Was the file really modified?
-    if time.time() - os.stat(action['file']).st_ctime > 60:
+    if time.time() - os.stat(action['file']).st_ctime > ctime:
         log(utils.DEBUG2,
             "LV1 event: skipping non-modifying RSYNC event " +
             "for file: "+action['file'])
@@ -102,7 +102,8 @@ def dequeue():
                         action['method'] = "RSYNC"
                 # Before-sync checks
                 if action['method'] == "RSYNC":
-                    if not rsync_checks(action):
+                    ctime = max((options.interval*2)+1, 60)
+                    if not rsync_checks(action, ctime):
                         continue
                     # Is the file currently being written?
                     if (time.time() - os.stat(action['file']).st_ctime <=
