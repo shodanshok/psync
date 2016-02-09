@@ -31,12 +31,6 @@ def parse_options():
     parser.add_option("-c", "--checksum", dest="checksum",
                       help="Compute checksum for changed files",
                       action="store_true", default=False)
-    parser.add_option("-k", "--fake-checksum", dest="fakechecksum",
-                      help="Do not really compute checksum",
-                      action="store_true", default=False)
-    parser.add_option("-n", "--newer", dest="newer",
-                      help="Consider only files changed since N minutes",
-                      action="store", default=None)
     parser.add_option("-m", "--modified_only", dest="modified_only",
                       help="Consider only modified files, ignoring new files",
                       action="store_true", default=False)
@@ -48,9 +42,6 @@ def parse_options():
     parser.add_option("--dstroot", dest="dstroot", action="store",
                       default=None)
     (options, args) = parser.parse_args()
-    # Fake checksum implies checksum
-    if options.fakechecksum:
-        options.checksum = True
     # Checksum or modified_only automatically disables lite check
     if options.checksum or options.modified_only:
         options.lite = False
@@ -80,44 +71,12 @@ def execute(cmd, stdin=None):
             sys.stderr.write(error)
     return (process, output, error)
 
-def checksum(source, basedir, changed):
-    # Set initial values
-    clist = {}
-    changedfiles = "\n".join(set(changed))
-    # Command selection
-    if source == "L":
-        cmd = ["xargs", "-d", "\n", config.csumbin, "-b", basedir]
-    else:
-        cmd = (["ssh"] + config.ssh_options +
-               [options.dsthost, "xargs", "-d", "'\n'", config.csumbin,
-                "-b", basedir])
-    # Append other options
-    if options.newer:
-        cmd.append("-n")
-        cmd.append(options.newer)
-    if options.fakechecksum:
-        cmd.append("-k")
-    # Execute
-    (process, output, error) = execute(cmd, changedfiles)
-    if process.returncode or len(output) <= 0:
-        return (process.returncode, clist)
-    # Parse output
-    for line in output.split("\n"):
-        if len(line):
-            csum = line[:CSUMLEN]
-            name = line[CSUMLEN+1:]
-            clist[name] = csum
-    # Return
-    return (process.returncode, clist)
-
-def check(src, dst):
-    # Set initial values
-    alert = False
-    count = 0
-    if options.checksum:
-        changed = []
-    else:
-        changed = ""
+def check(src, dst, filelist="", checksum=False):
+    if options.debug:
+        print "filelist: "+filelist
+    # If checksum is enabled, continue only with a filelist
+    if not len(filelist) and checksum:
+        return 0, ""
     # Check via rsync
     excludelist = utils.gen_exclude(options.rsync_excludes)
     try:
@@ -128,14 +87,13 @@ def check(src, dst):
     # Set filesize limit
     # For lite or modified_only checks, use the default from config.py
     # For full check or when using cheksum, increse size limit
-    if options.checksum:
-        rsync_args.append("--max-size=1024G")
-    elif options.modified_only:
-        pass
-    elif options.lite:
+    if options.modified_only or options.lite:
         pass
     else:
         rsync_args.append("--max-size=1024G")
+    # Enable checksum
+    if checksum:
+        rsync_args.append("--checksum")
     # Link disabling
     if options.nolinks:
         try:
@@ -146,9 +104,15 @@ def check(src, dst):
     # Construct command and execute
     cmd = (["rsync"] + options.extra + rsync_args + ["-n"] +
            excludelist + [src, dst])
-    (process, output, error) = execute(cmd)
-    if process.returncode:
-        return (process.returncode, count, changed, alert)
+    (process, output, error) = execute(cmd, filelist)
+    # Return
+    return process.returncode, output
+
+def parse_output(output, strip=False, checksum=False):
+    # Initial values
+    count = 0
+    changed = ""
+    alert = False
     # Count changed files
     for line in output.split("\n"):
         # If empty, ignore
@@ -157,8 +121,11 @@ def check(src, dst):
         # If not transfered, ignore
         if line[0] != "<" and line[0] != ">":
             continue
+        # If local checksum, ignore any matching files:
+        if checksum and line[2] != "c":
+            continue
         # If checksum or modified_only, ignore new files
-        if options.checksum and line[3] == "+":
+        elif options.checksum and line[3] == "+":
             continue
         # Modified_only checks focus on existing files with different size
         elif options.modified_only and line[3] != "s":
@@ -166,81 +133,61 @@ def check(src, dst):
         # Lite checks ignore existing files with same size
         elif options.lite and line[3] != "s" and line[3] != "+":
             continue
+        # If we arrived here, the line is interesting.
+        # Count changed lines
+        count = count+1
+        # If strip, grep the filename only
+        if strip:
+            line = line[FLAGLEN:]
+        # Append the changed line
+        changed = utils.concat(changed, line)
         # Alerts
+        # For checksum, raise an alert for a non-matching file
+        if checksum and line[2] == "c":
+            alert = True
         # For modified_only checks, raise an alert if size
         # of an existing file changed. Otherwise, continue
-        if options.modified_only and line[3] == "s":
+        elif options.modified_only and line[3] == "s":
             alert = True
         # For full checks, raise an alert if size OR time
         # of an existing file changed. Otherwise, continue
         elif not options.lite and (line[3] == "s" or line[4] == "t"):
             alert = True
-        # If we arrived here, the line is interesting.
-        # Count changed lines
-        count = count+1
-        if options.checksum:
-            changed.append(line[FLAGLEN:])
-        else:
-            changed = utils.concat(changed, line)
     # Return
-    return (process.returncode, count, changed, alert)
+    return (count, changed, alert)
 
 def showrdiff(src, dst, changed):
     if len(changed):
         print "\nDifferences found while checking FROM "+src+" TO "+dst
         print changed.rstrip("\n")
 
-def showcdiff(llist, rlist):
-    # Initial values
-    changed = ""
-    alert = False
-    for entry in llist:
-        lsum = llist[entry]
-        rsum = rlist[entry]
-        # If sum is equal, continue
-        if lsum == rsum:
-            continue
-        # If sum is zero, continue
-        if lsum == FAKESUM or rsum == FAKESUM:
-            continue
-        # If sums differ
-        changed = utils.concat(changed, entry)
-        alert = True
-    # If found, print the differing files
-    if len(changed):
-        print "\nDifferences found"
-        print changed.rstrip("\n")
-    return (alert, alert)
-
-
 # Initial values and options parsing
 error = 0
 (options, args) = parse_options()
+(src, dst) = (options.srcroot, options.dsthost+":"+options.dstroot)
 # Find changed files with rsync
-(lcheck, lcount, lchanged, lalert) = check(options.srcroot,
-                                           options.dsthost+":"+options.dstroot)
-(rcheck, rcount, rchanged, ralert) = check(options.dsthost+":"+options.dstroot,
-                                           options.srcroot)
-# If rsync died with an error, quit
+(lcheck, loutput) = check(src, dst)
+(rcheck, routput) = check(dst, src)
 if lcheck or rcheck:
     error = 1
     quit(error)
-
-# If checksum is needed, calculate it. Otherwise, print rsync output
+# Parse rsync output
+(lcount, lchanged, lalert) = parse_output(loutput, strip=options.checksum)
+(rcount, rchanged, ralert) = parse_output(routput, strip=options.checksum)
+# If checksum, do the second pass
 if options.checksum:
-    bchanged = lchanged + rchanged
-    (lchecksum, llist) = checksum("L", options.srcroot, bchanged)
-    (rchecksum, rlist) = checksum("R", options.dstroot, bchanged)
-    if lchecksum or rchecksum:
+    # Only check the specified files
+    (lcheck, loutput) = check(src, dst, filelist=lchanged, checksum=True)
+    (rcheck, routput) = check(dst, src, filelist=rchanged, checksum=True)
+    if lcheck or rcheck:
         error = 1
-    else:
-        (lalert, ralert) = showcdiff(llist, rlist)
-else:
-    showrdiff(options.srcroot, options.dsthost+":"+options.dstroot, lchanged)
-    showrdiff(options.dsthost+":"+options.dstroot, options.srcroot, rchanged)
-# If checksum died with an error, quit
-if error:
-    quit(error)
+        quit(error)
+    # Parse rsync output
+    (lcount, lchanged, lalert) = parse_output(loutput, checksum=True)
+    (rcount, rchanged, ralert) = parse_output(routput, checksum=True)
+# Print the differences
+showrdiff(src, dst, lchanged)
+showrdiff(dst, src, rchanged)
 
 # Error reporting
 # 0: no differences at all
