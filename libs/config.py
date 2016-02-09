@@ -30,7 +30,7 @@ translate = None #translate = "____archive____/|None"
 rsync_excludes = [".psync", "*.psync.ignore", "*.rsync-partial", ".*.??????",
                   "____archive____", "*.symlink", "*.tmp", "*.TMP", "*.~tmp~",
                   "Thumbs.db", "~$*"]
-rsync_extra = ["-L", "-u", "--timeout=10", "--max-size=90M",
+rsync_extra = ["-L", "--timeout=10", "--max-size=90M",
                "--partial-dir=.rsync-partial"]
 inotify_extra = ["-E", "____archive____", "-q", "-s"]
 tempfiles = "\.tmp$|\.~tmp~|/~\$"

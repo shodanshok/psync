@@ -7,6 +7,7 @@ import optparse
 import inspect
 import hashlib
 import time
+import math
 import sys
 import os
 import re
@@ -56,10 +57,11 @@ def delay_action(action):
     sleeptime = time.time() - action['timestamp']
     time.sleep(options.interval - sleeptime)
 
-def rsync_checks(action, ctime=60):
+def rsync_checks(action, delay=60):
     if action['method'] != "RSYNC":
         return True
     # Is the to-be-synched file a valid one?
+    now = time.time()
     try:
         stat = os.stat(action['file'])
     except:
@@ -77,12 +79,25 @@ def rsync_checks(action, ctime=60):
             "for zero-sized file: " + action['file'])
         return False
     # Was the file really modified?
-    if time.time() - os.stat(action['file']).st_ctime > ctime:
+    if now - stat.st_ctime > delay:
         log(utils.DEBUG2,
             "LV1 event: skipping non-modifying RSYNC event " +
             "for file: "+action['file'])
         return False
-    # If all it's ok, return True
+    # Suppress backfire from Explorer
+    (st_mtime_f, st_mtime_i) = math.modf(stat.st_mtime)
+    (st_atime_f, st_atime_i) = math.modf(stat.st_atime)
+    (st_ctime_f, st_ctime_i) = math.modf(stat.st_ctime)
+    # If mtime has no fractional part and
+    # atime is newer than ctime and mtime is recent, this can be
+    # an Explorer-backfired RSYNC event. Skip it
+    if (not st_mtime_f and st_atime_i+1 > st_ctime_i and
+            now - stat.st_mtime < delay*2):
+        log(utils.DEBUG2,
+            "LV1 event: skipping Explorer-backfired RSYNC event " +
+            "for file: "+action['file'])
+        return False
+    # If it's all ok, return True
     return True
 
 def dequeue():
@@ -102,8 +117,8 @@ def dequeue():
                         action['method'] = "RSYNC"
                 # Before-sync checks
                 if action['method'] == "RSYNC":
-                    ctime = max((options.interval*2)+1, 60)
-                    if not rsync_checks(action, ctime):
+                    delay = max((options.interval*2)+1, 60)
+                    if not rsync_checks(action, delay):
                         continue
                     # Is the file currently being written?
                     if (time.time() - os.stat(action['file']).st_ctime <=
