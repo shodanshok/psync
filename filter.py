@@ -57,33 +57,43 @@ def delay_action(action):
     sleeptime = time.time() - action['timestamp']
     time.sleep(options.interval - sleeptime)
 
-def rsync_checks(action, delay=60):
-    if action['method'] != "RSYNC":
-        return True
+def rsync_file_exists(action):
     # Is the to-be-synched file a valid one?
-    now = time.time()
     try:
         stat = os.stat(action['file'])
+        return stat
     except:
         log(utils.DEBUG2,
             "LV1 event: skipping stale RSYNC event " +
             "for file: "+action['file'])
-        return False
-    # If heartfile, relax checks
-    if action['file'] == heartfile:
+        return None
+
+def rsync_early_checks(action):
+    if action['method'] != "RSYNC":
         return True
-    # If file is zero-sized, ignore it
-    if not stat.st_size:
-        log(utils.DEBUG2,
-            "LV1 event: skipping RSYNC event " +
-            "for zero-sized file: " + action['file'])
+    # File exists?
+    stat = rsync_file_exists(action)
+    if not stat:
         return False
+    # Current timestamp
+    now = time.time()
     # Was the file really modified?
-    if now - stat.st_ctime > delay:
-        log(utils.DEBUG2,
-            "LV1 event: skipping non-modifying RSYNC event " +
-            "for file: "+action['file'])
-        return False
+    if now - stat.st_mtime > config.delay:
+        # The file is "old". Using relaxed ctime check due to
+        # Explorer delaying CLOSE_WRITE during copies
+        if now - stat.st_ctime > config.delay:
+            log(utils.DEBUG2,
+                "LV1 event: skipping non-modifying RSYNC event (type 01) " +
+                "for file: "+action['file'])
+            return False
+    else:
+        # The file is very new. Using strict ctime check to avoid
+        # backfire and unwanted rsync events
+        if now - stat.st_ctime > options.interval:
+            log(utils.DEBUG2,
+                "LV1 event: skipping non-modifying RSYNC event (type 02) " +
+                "for file: "+action['file'])
+            return False
     # Suppress backfire from Explorer
     (st_mtime_f, st_mtime_i) = math.modf(stat.st_mtime)
     (st_atime_f, st_atime_i) = math.modf(stat.st_atime)
@@ -92,12 +102,30 @@ def rsync_checks(action, delay=60):
     # atime is newer than ctime and mtime is recent, this can be
     # an Explorer-backfired RSYNC event. Skip it
     if (not st_mtime_f and st_atime_i+1 > st_ctime_i and
-            now - stat.st_mtime < delay*2):
+            now - stat.st_mtime+1 < config.delay):
         log(utils.DEBUG2,
-            "LV1 event: skipping Explorer-backfired RSYNC event " +
+            "LV1 event: skipping Explorer-backfired RSYNC event (type 03) " +
             "for file: "+action['file'])
         return False
-    # If it's all ok, return True
+    # If all is ok, return True
+    return True
+
+def rsync_late_checks(action):
+    if action['method'] != "RSYNC":
+        return True
+    # File exists?
+    stat = rsync_file_exists(action)
+    if not stat:
+        return False
+    # Current timestamp
+    now = time.time()
+    # Is the file currently being written?
+    if time.time() - stat.st_ctime <= min(1, options.interval):
+        log(utils.INFO,
+            "LV1 event: delaying currently changing file " +
+            action['file'])
+        return False
+    # If all is ok, return True
     return True
 
 def dequeue():
@@ -115,17 +143,9 @@ def dequeue():
                             "LV1 event: change from DELETE to RSYNC " +
                             "for file: " + action['file'])
                         action['method'] = "RSYNC"
-                # Before-sync checks
+                # Late rsync checks
                 if action['method'] == "RSYNC":
-                    delay = max((options.interval*2)+1, 60)
-                    if not rsync_checks(action, delay):
-                        continue
-                    # Is the file currently being written?
-                    if (time.time() - os.stat(action['file']).st_ctime <=
-                            min(1, options.interval)):
-                        log(utils.INFO,
-                            "LV1 event: delaying currently changing file " +
-                            action['file'])
+                    if not rsync_late_checks(action):
                         continue
                 # Construct and print line
                 line = (action['method'] + config.separator +
@@ -302,7 +322,7 @@ def parse_line(line):
              'file':filename, 'dstfile':dstfile, 'timestamp':time.time()}
     # Rsync checks
     if method == "RSYNC":
-        if not rsync_checks(entry):
+        if not rsync_early_checks(entry):
             return
     # Coalesce and append actions
     try:
