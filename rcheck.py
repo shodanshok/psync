@@ -52,15 +52,16 @@ def parse_options():
 
 def execute(cmd, stdin=None):
     # Execute
+    if options.debug:
+        print "cmd: "+str(cmd)
+        print "stdin: "+stdin
     process = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE)
     (output, error) = process.communicate(stdin)
     # Output reporting
-    if options.debug:
-        print cmd
-        if output:
-            print output
+    if options.debug and output:
+        print output
     # Ignore specific rsync errors
     if process.returncode in utils.RSYNC_SUCCESS:
         process.returncode = 0
@@ -72,10 +73,8 @@ def execute(cmd, stdin=None):
     return (process, output, error)
 
 def check(src, dst, filelist="", checksum=False):
-    if options.debug:
-        print "filelist: "+filelist
     # If checksum is enabled, continue only with a filelist
-    if not len(filelist) and checksum:
+    if not filelist and checksum:
         return 0, ""
     # Check via rsync
     excludelist = utils.gen_exclude(options.rsync_excludes)
@@ -101,6 +100,9 @@ def check(src, dst, filelist="", checksum=False):
         except:
             pass
         rsync_args.append("--no-l")
+    # Pass filelist
+    if filelist:
+        rsync_args.append("--files-from=-")
     # Construct command and execute
     cmd = (["rsync"] + options.extra + rsync_args + ["-n"] +
            excludelist + [src, dst])

@@ -94,17 +94,13 @@ def rsync_early_checks(action):
                 "LV1 event: skipping non-modifying RSYNC event (type 02) " +
                 "for file: "+action['file'])
             return False
-    # Suppress backfire from Explorer
-    (st_mtime_f, st_mtime_i) = math.modf(stat.st_mtime)
-    # If mtime has no fractional part and
-    # atime is newer than ctime and mtime is recent, this can be
-    # an Explorer-backfired RSYNC event. Skip it
-    if (not st_mtime_f and stat.st_atime+1 > stat.st_ctime and
-            now - stat.st_mtime+1 < config.delay):
-        log(utils.DEBUG2,
-            "LV1 event: skipping Explorer-backfired RSYNC event (type 03) " +
-            "for file: "+action['file'])
-        return False
+        # Suppress backfire from Explorer
+        (st_mtime_f, st_mtime_i) = math.modf(stat.st_mtime)
+        if not st_mtime_f and stat.st_atime+1 > stat.st_ctime:
+            log(utils.DEBUG2,
+                "LV1 event: skipping Explorer-backfired RSYNC event " +
+                "(type 03) for file: "+action['file'])
+            return False
     # If all is ok, return True
     return True
 

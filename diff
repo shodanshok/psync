@@ -1,10 +1,9 @@
 #!/bin/bash
 dst=$1
-for file in `find . | grep -v "\.git"`; do
-    if [ "$file" == "diff" ]; then
-        continue
+for file in `find . -type f | grep -v "\.git"`; do
+    if [ "$file" != "./diff" ]; then
+        echo "COMPARING file $file to $dst/$file"
+        diff "$file" "$dst/$file"
+        echo -n
     fi
-    echo "COMPARING file $file to $dst/$file"
-    diff "$file" "$dst/$file"
-    echo -n
 done
