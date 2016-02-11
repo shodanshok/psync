@@ -89,7 +89,7 @@ def rsync_early_checks(action):
     else:
         # The file is very new. Using strict ctime check to avoid
         # backfire and unwanted rsync events
-        if now - stat.st_ctime > options.interval:
+        if now - stat.st_ctime > min(15, config.delay):
             log(utils.DEBUG2,
                 "LV1 event: skipping non-modifying RSYNC event (type 02) " +
                 "for file: "+action['file'])
