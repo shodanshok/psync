@@ -95,12 +95,13 @@ def rsync_early_checks(action):
                 "for file: "+action['file'])
             return False
         # Suppress backfire from Explorer
-        (st_mtime_f, st_mtime_i) = math.modf(stat.st_mtime)
-        if not st_mtime_f and stat.st_atime+1 > stat.st_ctime:
-            log(utils.DEBUG2,
-                "LV1 event: skipping Explorer-backfired RSYNC event " +
-                "(type 03) for file: "+action['file'])
-            return False
+        if action['flags'] != "force":
+            (st_mtime_f, st_mtime_i) = math.modf(stat.st_mtime)
+            if not st_mtime_f and stat.st_atime+1 > stat.st_ctime:
+                log(utils.DEBUG2,
+                    "LV1 event: skipping Explorer-backfired RSYNC event " +
+                    "(type 03) for file: "+action['file'])
+                return False
     # If all is ok, return True
     return True
 
@@ -255,6 +256,8 @@ def parse_line(line):
     else:
         itemtype = "FILE"
     event = utils.deconcat(event, ",")[0]
+    # Flags - by default, they are empty
+    flags = ""
     # Select sync method and skip unwanted events
     # On directories, CREATE is skipped to avoid backfire from rsync
     # On files, CREATE is skipped because we want to sync only
@@ -295,6 +298,7 @@ def parse_line(line):
         if re.search(options.tempfiles, filename, re.I):
             method = "RSYNC"
             filename = dstfile
+            flags = "force"
             log(utils.DEBUG2, "Changing method from MOVE to RSYNC " +
                 "for tempfile " + filename)
     # If event is from/to excluded files, ignore it
@@ -313,7 +317,8 @@ def parse_line(line):
         return
     # Construct action
     entry = {'method':method, 'itemtype':itemtype, 'dir':dirname,
-             'file':filename, 'dstfile':dstfile, 'timestamp':time.time()}
+             'file':filename, 'dstfile':dstfile, 'timestamp':time.time(),
+             'flags':flags}
     # Rsync checks
     if method == "RSYNC":
         if not rsync_early_checks(entry):
@@ -325,7 +330,7 @@ def parse_line(line):
         prev = False
     if prev:
         if (method == "RSYNC" and prev['method'] == "DELETE" and
-                filename == prev['file']):
+                filename == prev['file'] and flags == prev['flags']):
             pass
         else:
             actions.append(prev)
