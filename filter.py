@@ -95,7 +95,7 @@ def rsync_early_checks(action):
                 "for file: "+action['file'])
             return False
         # Suppress backfire from Explorer
-        if action['flags'] != "force":
+        if action['flags'] != utils.FFORCE:
             (st_mtime_f, st_mtime_i) = math.modf(stat.st_mtime)
             if not st_mtime_f and stat.st_atime+1 > stat.st_ctime:
                 log(utils.DEBUG2,
@@ -147,7 +147,8 @@ def dequeue():
                         action['itemtype'] + config.separator +
                         action['dir'] + config.separator +
                         str(action['file']) + config.separator +
-                        str(action['dstfile']))
+                        str(action['dstfile']) + config.separator +
+                        action['flags'])
                 checksum = hashlib.md5(line).hexdigest()
                 print line + config.separator + checksum + "\n",
                 sys.stdout.flush()
@@ -257,7 +258,7 @@ def parse_line(line):
         itemtype = "FILE"
     event = utils.deconcat(event, ",")[0]
     # Flags - by default, they are empty
-    flags = ""
+    flags = utils.FNORMAL
     # Select sync method and skip unwanted events
     # On directories, CREATE is skipped to avoid backfire from rsync
     # On files, CREATE is skipped because we want to sync only
@@ -298,7 +299,7 @@ def parse_line(line):
         if re.search(options.tempfiles, filename, re.I):
             method = "RSYNC"
             filename = dstfile
-            flags = "force"
+            flags = utils.FFORCE
             log(utils.DEBUG2, "Changing method from MOVE to RSYNC " +
                 "for tempfile " + filename)
     # If event is from/to excluded files, ignore it

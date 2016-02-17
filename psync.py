@@ -307,6 +307,8 @@ def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True):
         rsync_options.append("-r")
     if acl and (action['source'] == "L" or not config.acl_from_left_only):
         rsync_options.append("-AX")
+    if action['flags'] == utils.FFORCE and config.maxsize:
+        rsync_options.append(config.maxsize)
     # Command selection
     if action['source'] == "L":
         left = options.srcroot
@@ -549,8 +551,9 @@ def reader(process, source="B"):
                     "Not connected, ignoring event: " + line)
             continue
         # Be sure to process a good formed line
+        nfields = 6
         match = re.match("^(RSYNC|MOVE|DELETE|NONE)", line, flags=re.I)
-        if not match or line.count(config.separator) != 5:
+        if not match or line.count(config.separator) != nfields:
             log(utils.WARNING, source,
                 "Rogue line (n." + str(rogue) + "): " + line)
             rogue = rogue + 1
@@ -566,7 +569,8 @@ def reader(process, source="B"):
         parent = utils.normalize_dir(entry[2])
         srcfile = entry[3]
         dstfile = entry[4]
-        checksum = entry[5]
+        flags = entry[5]
+        checksum = entry[6]
         # Validate checksum
         computed = line[:-len(config.separator + checksum)]
         computed = hashlib.md5(computed).hexdigest()
@@ -613,9 +617,10 @@ def reader(process, source="B"):
                     # source and method are same than previous
                     source == prev['source'] and method == prev['method'] and (
                         (
-                            # method is rsync and backfired is the same
+                            # method is rsync and other options are the same
                             prev['method'] == "RSYNC" and
-                            prev['backfired'] == backfired
+                            prev['backfired'] == backfired and
+                            prev['flags'] == flags
                         ) or (
                             # method is delete
                             prev['method'] == "DELETE"
@@ -636,7 +641,7 @@ def reader(process, source="B"):
         entry = {'source': source, 'method': method, 'itemtype': itemtype,
                  'filelist': filelist, 'dstfile': dstfile,
                  'eventid': checksum[-5:], 'backfired': backfired,
-                 'recurse': False}
+                 'flags': flags, 'recurse': False}
         actions.append(entry)
 
 

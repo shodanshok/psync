@@ -19,7 +19,12 @@ INFO = 0
 DEBUG1 = -1
 DEBUG2 = -2
 DEBUG3 = -3
-##################
+###########################
+
+#### FILTER FLAGS ####
+FNORMAL = "normal"
+FFORCE = "force"
+######################
 
 ### EXIT CODES ###
 PSUCCESS = 0
