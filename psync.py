@@ -158,7 +158,7 @@ def dequeue():
         if are_ready():
             # Select appropriate command
             if action['method'] == "RSYNC":
-                rsync(action, acl=True, maxsize=0)
+                rsync(action, acl=True)
             if action['method'] == "DELETE":
                 delete(action)
             if action['method'] == "MOVE":
@@ -296,8 +296,7 @@ def move(action):
     rsync(action)
 
 
-def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True,
-          maxsize=config.maxsize):
+def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True):
     log(utils.DEBUG1, action['source'], "RSYNC action",
         eventid=action['eventid'])
     # Options selection
@@ -308,8 +307,6 @@ def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True,
         rsync_options.append("-r")
     if acl and (action['source'] == "L" or not config.acl_from_left_only):
         rsync_options.append("-AX")
-    if maxsize and type(maxsize) is int:
-        rsync_options.append("--max-size="+str(maxsize))
     # Command selection
     if action['source'] == "L":
         left = options.srcroot

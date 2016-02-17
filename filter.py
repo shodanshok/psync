@@ -120,13 +120,6 @@ def rsync_late_checks(action):
             "LV1 event: delaying currently changing file " +
             action['file'])
         return False
-    # Is the file too big?
-    if action['flags'] != "force":
-        if config.maxsize and stat.st_size > config.maxsize:
-            log(utils.INFO,
-                "LV1 event: skipping event for oversized file " +
-                action['file'] + " (size: "+str(stat.st_size)+")")
-            return False
     # If all is ok, return True
     return True
 
