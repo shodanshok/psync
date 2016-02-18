@@ -289,14 +289,17 @@ def move(action):
         log(utils.INFO, action['source'], error, eventid=action['eventid'])
         log(utils.INFO, action['source'], "MOVE failed. Retrying with RSYNC",
             eventid=action['eventid'])
-    # After the move, do a recursive check with rsync
-    action['method'] = "RSYNC"
-    action['filelist'] = action['dstfile']
-    action['recurse'] = True
-    rsync(action)
+    # If recursive move is enabled or the move failed,
+    # do a recursive check with rsync
+    if config.move_event_recurse or process.returncode:
+        action['method'] = "RSYNC"
+        action['filelist'] = action['dstfile']
+        action['recurse'] = True
+        rsync(action, updateonly=True)
 
 
-def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True):
+def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True,
+          updateonly=False):
     log(utils.DEBUG1, action['source'], "RSYNC action",
         eventid=action['eventid'])
     # Options selection
@@ -309,6 +312,8 @@ def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True):
         rsync_options.append("-AX")
     if action['flags'] == utils.FFORCE and config.maxsize:
         rsync_options.append(config.maxsize)
+    if updateonly:
+        rsync_options.append("-u")
     # Command selection
     if action['source'] == "L":
         left = options.srcroot

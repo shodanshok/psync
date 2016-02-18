@@ -45,6 +45,7 @@ pending_lifetime = 60
 pending_events = ["RSYNC", "DELETE"]
 ssh_options = ["-o", "ConnectTimeout=10", "-C"]
 rsync_event_recurse = False
+move_event_recurse = True
 alert_threshold = 10
 rsync_style = 2 # 1: continuous, 2: continuous w/o backfired, 3: batchched
 acl_from_left_only = True
