@@ -123,21 +123,56 @@ def rsync_late_checks(action):
     # If all is ok, return True
     return True
 
+def delete_checks(action):
+    # Current timestamp
+    now = time.time()
+    # Is the file really gone? 1st check
+    if os.path.exists(action['file']):
+        log(utils.DEBUG2,
+            "LV1 event: skipping DELETE " +
+            "for file: " + action['file'])
+        return False
+    # Is the to-be-deleted file synchronizing?
+    try:
+        relname = os.path.basename(action['file'])
+        token = action['dir']+"."+relname+"."
+        for entry in os.listdir(action['dir']):
+            entry = action['dir']+entry
+            log(utils.DEBUG3, "ENTRY: "+entry)
+            log(utils.DEBUG3, "TOKEN: "+token)
+            if (token in entry and
+                    now - os.stat(entry).st_ctime <
+                    options.interval):
+                log(utils.DEBUG2,
+                    "LV1 event: skipping DELETE " +
+                    "for file: " + action['file'])
+                return False
+    except:
+        pass
+    # Is the file really gone? 2nd check
+    if os.path.exists(action['file']):
+        log(utils.DEBUG2,
+            "LV1 event: skipping DELETE " +
+            "for file: " + action['file'])
+        action['method'] = "RSYNC"
+        return False
+    # If the file is really gone, return True
+    return True
+
 def dequeue():
     while True:
         try:
             action = actions.popleft()
+            # Current timestamp
+            now = time.time()
             # Delay interval time
-            if time.time() - action['timestamp'] >= options.interval:
+            if now - action['timestamp'] >= options.interval:
                 if action['file'] != heartfile:
                     log(utils.DEBUG3, "LV1 action: "+str(action))
                 # Are we sure to delete?
                 if action['method'] == "DELETE":
-                    if os.path.exists(action['file']):
-                        log(utils.DEBUG2,
-                            "LV1 event: change from DELETE to RSYNC " +
-                            "for file: " + action['file'])
-                        action['method'] = "RSYNC"
+                    if not delete_checks(action):
+                        continue
                 # Late rsync checks
                 if action['method'] == "RSYNC":
                     if not rsync_late_checks(action):
