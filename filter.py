@@ -130,31 +130,42 @@ def delete_checks(action):
     if os.path.exists(action['file']):
         log(utils.DEBUG2,
             "LV1 event: skipping DELETE " +
-            "for file: " + action['file'])
+            "for file: " + action['file'] +
+            " - Reason: file found")
         return False
     # Is the to-be-deleted file synchronizing?
+    relname = os.path.basename(action['file'])
+    token = action['dir']+"."+relname+"."
+    log(utils.DEBUG3, "TOKEN: "+token)
     try:
-        relname = os.path.basename(action['file'])
-        token = action['dir']+"."+relname+"."
         for entry in os.listdir(action['dir']):
             entry = action['dir']+entry
             log(utils.DEBUG3, "ENTRY: "+entry)
-            log(utils.DEBUG3, "TOKEN: "+token)
             if (token in entry and
                     now - os.stat(entry).st_ctime <
                     config.delay):
                 log(utils.DEBUG2,
                     "LV1 event: skipping DELETE " +
-                    "for file: " + action['file'])
+                    "for file: " + action['file'] +
+                    " - Reason: temp file found in current dir")
                 return False
     except:
         pass
+    # Give a look inside partial dir also
+    partialfile = action['dir']+".rsync-partial/"+relname
+    if (os.path.exists(partialfile) and
+            now - os.stat(partialfile).st_ctime < config.delay):
+        log(utils.DEBUG2,
+            "LV1 event: skipping DELETE " +
+            "for file: " + action['file'] +
+            " - Reason: temp file found in partial dir")
+        return False
     # Is the file really gone? 2nd check
     if os.path.exists(action['file']):
         log(utils.DEBUG2,
             "LV1 event: skipping DELETE " +
-            "for file: " + action['file'])
-        action['method'] = "RSYNC"
+            "for file: " + action['file'] +
+            " - Reason: file found")
         return False
     # If the file is really gone, return True
     return True
