@@ -142,7 +142,7 @@ def delete_checks(action):
             log(utils.DEBUG3, "TOKEN: "+token)
             if (token in entry and
                     now - os.stat(entry).st_ctime <
-                    options.interval):
+                    config.delay):
                 log(utils.DEBUG2,
                     "LV1 event: skipping DELETE " +
                     "for file: " + action['file'])
