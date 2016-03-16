@@ -295,7 +295,8 @@ def move(action):
         action['method'] = "RSYNC"
         action['filelist'] = action['dstfile']
         action['recurse'] = True
-        rsync(action, updateonly=True)
+        action['updateonly'] = True
+        rsync(action)
 
 
 def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True,
@@ -312,7 +313,7 @@ def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True,
         rsync_options.append("-AX")
     if action['flags'] == utils.FFORCE and config.maxsize:
         rsync_options.append(config.maxsize)
-    if updateonly:
+    if action['updateonly'] or updateonly:
         rsync_options.append("-u")
     # Command selection
     if action['source'] == "L":
@@ -646,7 +647,7 @@ def reader(process, source="B"):
         entry = {'source': source, 'method': method, 'itemtype': itemtype,
                  'filelist': filelist, 'dstfile': dstfile,
                  'eventid': checksum[-5:], 'backfired': backfired,
-                 'flags': flags, 'recurse': False}
+                 'flags': flags, 'recurse': False, 'updateonly': False}
         actions.append(entry)
 
 
