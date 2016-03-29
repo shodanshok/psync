@@ -89,7 +89,7 @@ def rsync_early_checks(action):
     else:
         # The file is very new. Using strict ctime check to avoid
         # backfire and unwanted rsync events
-        if now - stat.st_ctime > min(15, config.delay):
+        if now - stat.st_ctime > min(30, config.delay):
             log(utils.DEBUG2,
                 "LV1 event: skipping non-modifying RSYNC event (type 02) " +
                 "for file: "+action['file'])
@@ -103,6 +103,29 @@ def rsync_early_checks(action):
                     "(type 03) for file: "+action['file'])
                 return False
     # If all is ok, return True
+    return True
+
+def move_early_checks(action):
+    if action['method'] != "MOVE":
+        return True
+    # Destination
+    dst = action['dstfile']
+    # If dst is not a directory, return True
+    # It also returns True when dst does not exists,
+    # possibly due to chained MOVEs
+    if not os.path.isdir(dst):
+        return True
+    # If dst if empty, return False
+    # This is done to discard MOVEs on newly created dirs.
+    # In turn, this is done to prevent partial file uploads
+    # onto these newly created/renamed directories.
+    try:
+        if not os.listdir(dst):
+            log(utils.DEBUG2, "LV1 event: skipping MOVE on empty dir " + dst)
+            return False
+    except:
+        pass
+    # By default, return True (follow the MOVE)
     return True
 
 def rsync_late_checks(action):
@@ -369,6 +392,10 @@ def parse_line(line):
     # Rsync checks
     if method == "RSYNC":
         if not rsync_early_checks(entry):
+            return
+    # Move checks
+    if method == "MOVE":
+        if not move_early_checks(entry):
             return
     # Coalesce and append actions
     try:
