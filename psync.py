@@ -347,6 +347,8 @@ def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True,
 
 def full_syncher(oneshot=False):
     while True:
+        # Backup suffix
+        backupsuffix = "-"+time.strftime("%Y%m%d_%H%M")
         # If oneshot, run full sync immediately
         if oneshot:
             log(utils.INFO, "B", "INITIAL SYNC\n" +
@@ -363,6 +365,9 @@ def full_syncher(oneshot=False):
         # Add required options
         rsync_options = ["-AX"]
         rsync_options.append("--max-size=1024G")
+        rsync_options.append("-b")
+        rsync_options.append("--backup-dir="+config.backupdir)
+        rsync_options.append("--suffix="+backupsuffix)
         # Proceed
         ldirs = "/"
         rdirs = "/"
@@ -699,8 +704,17 @@ def beat(name, heart_field="last"):
 def runtime(name):
     return time.time() - state[name + "_time"]
 
-# Parse options
+
+def print_config():
+    log(utils.DEBUG2, "B", "CURRENT CONFIG DUMP")
+    for key, value in config.__dict__.iteritems():
+        if key.startswith("__"):
+            continue
+        log(utils.DEBUG2, "B", key+": "+str(value))
+
+# Parse options and print config
 (options, args) = parse_options()
+print_config()
 # Synchronize peers
 search_banned()
 if options.skipsync:

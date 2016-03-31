@@ -17,6 +17,9 @@ csumbin = basedir+"libs/csum.py"
 # START OF USER EDITABLE CONFIGURATION
 # Safename suffix
 safesuffix = ".psync.ignore"
+# Service dir
+backupdir = ".rsync-backup"
+partialdir = ".rsync-partial"
 
 # Command line defaults
 debug = 0
@@ -27,14 +30,16 @@ first_sync_only = False
 skip_initial_sync = True
 banned = None
 translate = None #translate = "____archive____/|None"
-rsync_excludes = [".psync", "*.psync.ignore", "*.rsync-partial", ".*.??????",
+rsync_excludes = [".psync", "*.psync.ignore",
+                  partialdir, backupdir, ".*.??????",
                   "____archive____", "*.symlink", "*.tmp", "*.TMP", "*.~tmp~",
                   "Thumbs.db", "~$*"]
 rsync_extra = ["-L", "--timeout=10", "--max-size=1G",
-               "--partial-dir=.rsync-partial"]
+               "--partial-dir="+partialdir]
 inotify_extra = ["-E", "____archive____", "-q", "-s"]
 tempfiles = "\.tmp$|\.~tmp~|/~\$"
-excludes = (".psync.ignore|.rsync-partial|/\..*\.......$|/____archive____/" +
+excludes = (".psync.ignore|" + partialdir + "|" + backupdir +
+            "|/\..*\.......$|/____archive____/" +
             "|\.symlink$|/Thumbs.db$")
 
 # Internal configuration
@@ -59,4 +64,4 @@ etimeout = timeout-15       # Execute timeout
 maxtimeout = timeout*15     # Max connection timeout (abort)
 
 # Schedules
-fullsync = [01]
+fullsync = [1]
