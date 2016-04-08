@@ -160,7 +160,16 @@ def dequeue():
             if action['method'] == "RSYNC":
                 rsync(action, acl=True)
             if action['method'] == "DELETE":
-                delete(action)
+                # If full sync is running, skip DELETE events
+                if (locks['global'].acquire(False) or
+                        not full_syncher.is_alive()):
+                    locks['global'].release()
+                    delete(action)
+                else:
+                    for filename in utils.deconcat(action['filelist']):
+                        log(utils.INFO, action['source'],
+                            "FULL SYNC in progress. Skipping DELETE for " +
+                            filename, eventid=action['eventid'])
             if action['method'] == "MOVE":
                 move(action)
         else:
@@ -371,6 +380,8 @@ def full_syncher(oneshot=False):
         # Proceed
         ldirs = "/"
         rdirs = "/"
+        # Acquire lock
+        locks['global'].acquire(False)
         # First sync, from L to R
         success = True  # Be optimistic ;)
         excludelist = utils.gen_exclude(options.rsync_excludes)
@@ -397,6 +408,8 @@ def full_syncher(oneshot=False):
         if process.returncode not in utils.RSYNC_SUCCESS:
             success = False
         log(utils.INFO, "B", "TIMED FULL SYNC: Ending")
+        # Release lock
+        locks['global'].release()
         # If oneshot, return now
         if oneshot:
             return success
