@@ -625,6 +625,8 @@ def reader(process, source="B"):
             prev = actions.pop()
             # Is mergeable?
             if (
+                    # is not a symlink
+                    not os.path.islink(srcfile) and
                     # source and method are same than previous
                     source == prev['source'] and method == prev['method'] and (
                         (
