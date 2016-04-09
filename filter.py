@@ -193,7 +193,7 @@ def delete_checks(action):
         for entry in os.listdir(bckdir):
             log(utils.DEBUG3, "ENTRY: "+bckdir+entry)
             if (token in entry and
-                    now - os.stat(bckdir+entry).st_ctime <
+                    now - os.lstat(bckdir+entry).st_ctime <
                     config.delay):
                 log(utils.DEBUG2,
                     "LV1 event: skipping DELETE " +
