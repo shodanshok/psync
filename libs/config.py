@@ -56,6 +56,7 @@ rsync_style = 2 # 1: continuous, 2: continuous w/o backfired, 3: batchched
 acl_from_left_only = True
 delay = 60
 maxsize = False # ie: "--max-size=1G". If False no max size is onored
+full_sync_lock = True
 
 # Timeouts
 timeout = 60                # General timeout

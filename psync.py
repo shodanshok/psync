@@ -160,16 +160,20 @@ def dequeue():
             if action['method'] == "RSYNC":
                 rsync(action, acl=True)
             if action['method'] == "DELETE":
-                # If full sync is running, skip DELETE events
-                if (locks['global'].acquire(False) or
-                        not full_syncher.is_alive()):
-                    locks['global'].release()
-                    delete(action)
+                # If full sync is running and locks are enabled,
+                # skip DELETE events
+                if config.full_sync_lock:
+                    if (locks['global'].acquire(False) or
+                            not full_syncher.is_alive()):
+                        locks['global'].release()
+                        delete(action)
+                    else:
+                        for filename in utils.deconcat(action['filelist']):
+                            log(utils.INFO, action['source'],
+                                "FULL SYNC in progress. Skipping DELETE for " +
+                                filename, eventid=action['eventid'])
                 else:
-                    for filename in utils.deconcat(action['filelist']):
-                        log(utils.INFO, action['source'],
-                            "FULL SYNC in progress. Skipping DELETE for " +
-                            filename, eventid=action['eventid'])
+                    delete(action)
             if action['method'] == "MOVE":
                 move(action)
         else:
