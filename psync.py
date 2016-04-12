@@ -309,7 +309,7 @@ def move(action):
         action['filelist'] = action['dstfile']
         action['recurse'] = True
         action['updateonly'] = True
-        rsync(action)
+        rsync(action, acl=True)
 
 
 def rsync(action, recurse=config.rsync_event_recurse, acl=False, warn=True,
