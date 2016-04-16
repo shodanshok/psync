@@ -378,9 +378,11 @@ def full_syncher(oneshot=False):
         # Add required options
         rsync_options = ["-AX"]
         rsync_options.append("--max-size=1024G")
-        rsync_options.append("-b")
-        rsync_options.append("--backup-dir="+config.backupdir)
-        rsync_options.append("--suffix="+backupsuffix)
+        # If use_backupdir is enabled, add the relevant options
+        if config.use_backupdir:
+            rsync_options.append("-b")
+            rsync_options.append("--backup-dir="+config.backupdir)
+            rsync_options.append("--suffix="+backupsuffix)
         # Proceed
         ldirs = "/"
         rdirs = "/"

@@ -183,25 +183,27 @@ def delete_checks(action):
             "for file: " + action['file'] +
             " - Reason: temp file found in partial dir")
         return False
-    # Look inside backup dir also. This is to prevent rsync-caused
-    # symlink deletion to become real DELETE events
-    token = os.path.basename(action['file'])
-    reldirname = action['dir'][len(options.srcroot):]
-    bckdir = backupdir+reldirname
-    log(utils.DEBUG3, "TOKEN: "+bckdir+token)
-    try:
-        for entry in os.listdir(bckdir):
-            log(utils.DEBUG3, "ENTRY: "+bckdir+entry)
-            if (token in entry and
-                    now - os.lstat(bckdir+entry).st_ctime <
-                    config.delay):
-                log(utils.DEBUG2,
-                    "LV1 event: skipping DELETE " +
-                    "for file: " + action['file'] +
-                    " - Reason: file found in backup dir")
-                return False
-    except:
-        pass
+    # If use_backupdir is enabled, look inside it.
+    # This is to prevent rsync-caused symlink deletion
+    # to become real DELETE events
+    if config.use_backupdir:
+        token = os.path.basename(action['file'])
+        reldirname = action['dir'][len(options.srcroot):]
+        bckdir = backupdir+reldirname
+        log(utils.DEBUG3, "TOKEN: "+bckdir+token)
+        try:
+            for entry in os.listdir(bckdir):
+                log(utils.DEBUG3, "ENTRY: "+bckdir+entry)
+                if (token in entry and
+                        now - os.lstat(bckdir+entry).st_ctime <
+                        config.delay):
+                    log(utils.DEBUG2,
+                        "LV1 event: skipping DELETE " +
+                        "for file: " + action['file'] +
+                        " - Reason: file found in backup dir")
+                    return False
+        except:
+            pass
     # Is the file really gone? 2nd check
     if os.path.exists(action['file']):
         log(utils.DEBUG2,
