@@ -163,9 +163,10 @@ def dequeue():
                 # If full sync is running and locks are enabled,
                 # skip DELETE events
                 if config.full_sync_lock:
-                    if (locks['global'].acquire(False) or
-                            not full_syncher.is_alive()):
+                    if locks['global'].acquire(False):
                         locks['global'].release()
+                        delete(action)
+                    elif not full_syncher.is_alive():
                         delete(action)
                     else:
                         for filename in utils.deconcat(action['filelist']):
