@@ -127,10 +127,7 @@ def parse_output(output, strip=False, checksum=False):
         if checksum and line[2] != "c":
             continue
         # If checksum or modified_only, ignore new files
-        elif options.checksum and line[3] == "+":
-            continue
-        # Modified_only checks focus on existing files with different size
-        elif options.modified_only and line[3] != "s":
+        elif (options.checksum or options.modified_only) and line[3] == "+":
             continue
         # Lite checks ignore existing files with same size
         elif options.lite and line[3] != "s" and line[3] != "+":
@@ -146,10 +143,6 @@ def parse_output(output, strip=False, checksum=False):
         # Alerts
         # For checksum, raise an alert for a non-matching file
         if checksum and line[2] == "c":
-            alert = True
-        # For modified_only checks, raise an alert if size
-        # of an existing file changed. Otherwise, continue
-        elif options.modified_only and line[3] == "s":
             alert = True
         # For full checks, raise an alert if size OR time
         # of an existing file changed. Otherwise, continue
