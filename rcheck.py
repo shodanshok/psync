@@ -247,7 +247,12 @@ if options.lite:
 
 # If needed, do backups
 if options.backup:
-    dobackup(lchanged, rchanged)
+    # If backupdir is not defined, skip backups.
+    # Else, execute backup
+    if not config.backupdir or src == backupdir:
+        print "Skipping backup due to backupdir not defined"
+    else:
+        dobackup(lchanged, rchanged)
 
 # Exit with error code
 quit(error)
