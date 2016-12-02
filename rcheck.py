@@ -176,14 +176,16 @@ def dosidebackup(changed, side):
     return (process, output, error)
 
 def dobackup(lchanged, rchanged):
-    print
-    print "Doing backups..."
     (lprocess, loutput, lerror) = dosidebackup(lchanged, dst)
     (rprocess, routput, rerror) = dosidebackup(rchanged, src)
+    if not lprocess and not rprocess:
+        return
+    print
+    print "Doing backups..."
     print loutput
     print
     print routput
-    print "... done"
+    print "...done"
 
 # Initial values and options parsing
 error = 0
