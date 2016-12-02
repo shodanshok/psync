@@ -5,7 +5,7 @@ source /root/scripts/psync/conf/config.sh
 source ../customer_info
 
 extra=""
-while getopts ":cklmn:t:X" opt; do
+while getopts ":bcklmn:t:X" opt; do
     case $opt in
         l)
         extra+=" -l "
@@ -13,6 +13,9 @@ while getopts ":cklmn:t:X" opt; do
         ;;
         t)
         RCPT+=" $OPTARG "
+        ;;
+        b)
+        extra+=" -b "
         ;;
         c)
         extra+=" -c "
