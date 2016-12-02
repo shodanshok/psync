@@ -37,6 +37,8 @@ def parse_options():
     parser.add_option("-X", "--nolinks", dest="nolinks",
                       help="Exclude links from comparison",
                       action="store_true", default=False)
+    parser.add_option("-b", "--backup", dest="backup", help="Do backups",
+                      action="store_true", default=False)
     parser.add_option("--srcroot", dest="srcroot", action="store",
                       default=None)
     parser.add_option("--dstroot", dest="dstroot", action="store",
@@ -156,10 +158,38 @@ def showrdiff(src, dst, changed):
         print "\nDifferences found while checking FROM "+src+" TO "+dst
         print changed.rstrip("\n")
 
+def dosidebackup(changed, side):
+    if not changed:
+        return (None, None, None)
+    rsync_args = ["-avAX"]
+    filelist = ""
+    for line in utils.deconcat(changed):
+        if line[2] == "+":
+            continue
+        line = line[FLAGLEN:]
+        filelist = utils.concat(filelist, line)
+    if not filelist:
+        return (None, None, None)
+    cmd = (["rsync"] + options.extra + rsync_args +
+           ["--files-from=-", side, backupdir])
+    (process, output, error) = execute(cmd, filelist)
+    return (process, output, error)
+
+def dobackup(lchanged, rchanged):
+    print
+    print "Doing backups..."
+    (lprocess, loutput, lerror) = dosidebackup(lchanged, dst)
+    (rprocess, routput, rerror) = dosidebackup(rchanged, src)
+    print loutput
+    print
+    print routput
+    print "... done"
+
 # Initial values and options parsing
 error = 0
 (options, args) = parse_options()
 (src, dst) = (options.srcroot, options.dsthost+":"+options.dstroot)
+backupdir = utils.normalize_dir(src+config.backupdir)
 # Find changed files with rsync
 (lcheck, loutput) = check(src, dst)
 (rcheck, routput) = check(dst, src)
@@ -212,6 +242,10 @@ if options.lite:
         error = 0
     elif error == 3:
         error = 0
+
+# If needed, do backups
+if options.backup:
+    dobackup(lchanged, rchanged)
 
 # Exit with error code
 quit(error)
